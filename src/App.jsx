@@ -7,34 +7,36 @@ function App() {
   const [loading, setLoading] = useState(false)
 
  const handleAnalyze = async () => {
-  if (!jdText.trim()) {
-    alert('Pega la descripción del empleo (JD)')
-    return
+  if (!cvFile || !jdText.trim()) {
+    alert('Sube un CV y pega el JD');
+    return;
   }
 
-  setLoading(true)
-  const formData = new FormData()
-  formData.append('jd', jdText)
+  setLoading(true);
+  const formData = new FormData();
+  formData.append('cv', cvFile);
+  formData.append('jd', jdText);
 
   try {
     const res = await fetch('/api/analyze', {
       method: 'POST',
       body: formData
-    })
+    });
 
-    const data = await res.json()
+    const data = await res.json();
 
     if (data.success) {
-      setScores(data.scores)
+      setScores(data.scores);
+      setRecommendations(data.recommendations);
     } else {
-      alert('Error: ' + (data.error || 'Respuesta inválida'))
+      alert('Error: ' + data.error);
     }
   } catch (err) {
-    alert('Error de red: ' + err.message)
+    alert('Error: ' + err.message);
   } finally {
-    setLoading(false)
+    setLoading(false);
   }
-}
+};
 
   return (
     <div className="min-h-screen p-6 max-w-4xl mx-auto">
