@@ -8,18 +8,15 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' });
 
   try {
-    // Leer todo el body
     const chunks = [];
     for await (const chunk of req) chunks.push(chunk);
     const body = Buffer.concat(chunks).toString();
 
-    // Obtener boundary
     const boundaryMatch = req.headers['content-type']?.match(/boundary=([^;]+)/);
     if (!boundaryMatch) return res.status(400).json({ error: 'No boundary' });
     const boundary = boundaryMatch[1];
     const boundaryStr = `--${boundary}`;
 
-    // Dividir partes
     const parts = body.split(boundaryStr).slice(1, -1);
     let cvText = '';
     let jdText = '';
@@ -33,51 +30,35 @@ export default async function handler(req, res) {
       if (emptyLineIndex === -1) continue;
 
       const content = lines.slice(emptyLineIndex + 1).join('\r\n').trim();
-
       const nameMatch = disposition.match(/name="([^"]+)"/);
       const filenameMatch = disposition.match(/filename="([^"]+)"/);
       const name = nameMatch?.[1];
       const filename = filenameMatch?.[1] || '';
 
-      if (name === 'jd') {
-        jdText = content;
-      } else if (name === 'cv' && content) {
+      if (name === 'jd') jdText = content;
+      else if (name === 'cv' && content) {
         const buffer = Buffer.from(content, 'binary');
 
         if (filename.endsWith('.pdf')) {
-          try {
-            const data = await pdf(buffer);
-            cvText = data.text;
-          } catch (e) {
-            cvText = 'Error leyendo PDF';
-          }
+          const data = await pdf(buffer);
+          cvText = data.text;
         } else if (filename.endsWith('.docx')) {
-          try {
-            const result = await mammoth.extractRawText({ buffer });
-            cvText = result.value;
-          } catch (e) {
-            cvText = 'Error leyendo DOCX';
-          }
+          const result = await mammoth.extractRawText({ buffer });
+          cvText = result.value;
         }
       }
     }
 
-    if (!cvText || !jdText) {
-      return res.status(400).json({ error: 'Falta CV o JD' });
-    }
+    if (!cvText || !jdText) return res.status(400).json({ error: 'Falta CV o JD' });
 
-    // Normalizar
     const clean = (s) => s.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ');
     const cv = clean(cvText);
     const jd = clean(jdText);
 
-    // Keywords
     const jdWords = jd.match(/\b\w{4,}\b/g) || [];
     const cvWords = cv.match(/\b\w{4,}\b/g) || [];
-    const matched = jdWords.filter(w => cvWords.includes(w));
-    const matchRate = jdWords.length ? (matched.length / jdWords.length) * 100 : 0;
+    const matchRate = jdWords.length ? (jdWords.filter(w => cvWords.includes(w)).length / jdWords.length) * 100 : 0;
 
-    // 10 ATS Scores
     const scores = {
       Workday: Math.round(85 + matchRate * 0.15 + (cv.includes('mm/yyyy') ? 5 : 0)),
       Greenhouse: Math.round(82 + matchRate * 0.18),
@@ -91,15 +72,13 @@ export default async function handler(req, res) {
       Workable: Math.round(84 + matchRate * 0.16),
     };
 
-    // IA: Recomendaciones
     const missing = jdWords.filter(w => !cvWords.includes(w)).slice(0, 3);
     const tips = [];
     if (missing.length) tips.push(`Añade: "${missing.join('", "')}"`);
     if (!cv.includes('gerente') && jd.includes('gerente')) tips.push('Incluye "Gerente" en título');
     if (!cv.match(/\d+%/g)) tips.push('Agrega métricas: "Aumenté X en Y%"');
-    if (cv.includes('table')) tips.push('Elimina tablas');
 
-    res.status(200).json({
+    res.json({
       success: true,
       matchRate: Math.round(matchRate),
       scores,
@@ -108,7 +87,7 @@ export default async function handler(req, res) {
     });
 
   } catch (error) {
-    console.error('Error:', error);
-    res.status(500).json({ error: 'Error procesando archivo: ' + error.message });
+    console.error(error);
+    res.status(500).json({ error: 'Error: ' + error.message });
   }
 }
