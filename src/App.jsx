@@ -6,7 +6,7 @@ function App() {
   const [scores, setScores] = useState(null)
   const [loading, setLoading] = useState(false)
 
- const handleAnalyze = async () => {
+const handleAnalyze = async () => {
   if (!cvFile || !jdText.trim()) {
     alert('Sube un CV y pega el JD');
     return;

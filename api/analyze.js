@@ -1,54 +1,63 @@
 // api/analyze.js
 import pdf from 'pdf-parse';
+import mammoth from 'mammoth';
 
-export const config = {
-  api: {
-    bodyParser: false,
-  },
-};
+export const config = { api: { bodyParser: false } };
 
 export default async function handler(req, res) {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Método no permitido' });
-  }
+  if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' });
 
   try {
-    // Leer raw body
+    // Leer todo el body
     const chunks = [];
-    for await (const chunk of req) {
-      chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk);
-    }
-    const body = Buffer.concat(chunks);
+    for await (const chunk of req) chunks.push(chunk);
+    const body = Buffer.concat(chunks).toString();
 
-    // Parsear multipart manualmente
-    const boundary = req.headers['content-type']?.split('boundary=')[1];
-    if (!boundary) throw new Error('No boundary');
+    // Obtener boundary
+    const boundaryMatch = req.headers['content-type']?.match(/boundary=([^;]+)/);
+    if (!boundaryMatch) return res.status(400).json({ error: 'No boundary' });
+    const boundary = boundaryMatch[1];
+    const boundaryStr = `--${boundary}`;
 
-    const parts = body.toString().split(`--${boundary}`).slice(1, -1);
+    // Dividir partes
+    const parts = body.split(boundaryStr).slice(1, -1);
     let cvText = '';
     let jdText = '';
 
     for (const part of parts) {
-      const [header, content] = part.split('\r\n\r\n', 2);
-      if (!content) continue;
+      const lines = part.trim().split('\r\n');
+      if (lines.length < 4) continue;
 
-      const nameMatch = header.match(/name="([^"]+)"/);
-      const filenameMatch = header.match(/filename="([^"]+)"/);
+      const disposition = lines[0];
+      const emptyLineIndex = lines.findIndex(l => l === '');
+      if (emptyLineIndex === -1) continue;
+
+      const content = lines.slice(emptyLineIndex + 1).join('\r\n').trim();
+
+      const nameMatch = disposition.match(/name="([^"]+)"/);
+      const filenameMatch = disposition.match(/filename="([^"]+)"/);
       const name = nameMatch?.[1];
       const filename = filenameMatch?.[1] || '';
 
       if (name === 'jd') {
-        jdText = content.trim();
+        jdText = content;
       } else if (name === 'cv' && content) {
-        const fileBuffer = Buffer.from(content, 'binary');
+        const buffer = Buffer.from(content, 'binary');
 
         if (filename.endsWith('.pdf')) {
-          const data = await pdf(fileBuffer);
-          cvText = data.text;
+          try {
+            const data = await pdf(buffer);
+            cvText = data.text;
+          } catch (e) {
+            cvText = 'Error leyendo PDF';
+          }
         } else if (filename.endsWith('.docx')) {
-          // .docx → extraer texto plano (fallback)
-          const text = fileBuffer.toString('latin1');
-          cvText = text.replace(/[\x00-\x1F\x7F-\x9F]/g, ' ').replace(/\s+/g, ' ');
+          try {
+            const result = await mammoth.extractRawText({ buffer });
+            cvText = result.value;
+          } catch (e) {
+            cvText = 'Error leyendo DOCX';
+          }
         }
       }
     }
@@ -99,7 +108,7 @@ export default async function handler(req, res) {
     });
 
   } catch (error) {
-    console.error('Error:', error.message);
+    console.error('Error:', error);
     res.status(500).json({ error: 'Error procesando archivo: ' + error.message });
   }
 }
