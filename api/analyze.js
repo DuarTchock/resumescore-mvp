@@ -1,30 +1,39 @@
 // api/analyze.js
 import { createRequire } from 'module';
-import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
+import { writeFileSync, unlinkSync } from 'fs';
+import { tmpdir } from 'os';
+import { join } from 'path';
 
 const require = createRequire(import.meta.url);
+const PDFParser = require('pdf2json');
 const mammoth = require('mammoth');
 
 export const config = { api: { bodyParser: false } };
 
 async function extractTextFromPDF(buffer) {
-  try {
-    const data = new Uint8Array(buffer);
-    const pdf = await getDocument({ data, useSystemFonts: true }).promise;
-    let text = '';
+  return new Promise((resolve, reject) => {
+    const pdfParser = new PDFParser();
     
-    for (let i = 1; i <= pdf.numPages; i++) {
-      const page = await pdf.getPage(i);
-      const content = await page.getTextContent();
-      const pageText = content.items.map(item => item.str).join(' ');
-      text += pageText + '\n';
-    }
+    pdfParser.on('pdfParser_dataError', errData => {
+      reject(new Error(errData.parserError));
+    });
     
-    return text;
-  } catch (error) {
-    console.error('PDF extraction error:', error);
-    throw new Error('Error al procesar PDF');
-  }
+    pdfParser.on('pdfParser_dataReady', pdfData => {
+      try {
+        let text = '';
+        pdfData.Pages.forEach(page => {
+          page.Texts.forEach(textItem => {
+            text += decodeURIComponent(textItem.R[0].T) + ' ';
+          });
+        });
+        resolve(text);
+      } catch (err) {
+        reject(err);
+      }
+    });
+
+    pdfParser.parseBuffer(buffer);
+  });
 }
 
 export default async function handler(req, res) {
