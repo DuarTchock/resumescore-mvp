@@ -6,26 +6,34 @@ function App() {
   const [scores, setScores] = useState(null)
   const [loading, setLoading] = useState(false)
 
-  const handleAnalyze = async () => {
+ const handleAnalyze = async () => {
+  if (!jdText.trim()) {
+    alert('Pega la descripción del empleo (JD)')
+    return
+  }
+
   setLoading(true)
   const formData = new FormData()
-  formData.append('jd', jdText)  // Solo JD (simula CV por ahora)
+  formData.append('jd', jdText)
 
   try {
     const res = await fetch('/api/analyze', {
       method: 'POST',
       body: formData
     })
+
     const data = await res.json()
+
     if (data.success) {
       setScores(data.scores)
     } else {
-      alert('Error: ' + data.error)
+      alert('Error: ' + (data.error || 'Respuesta inválida'))
     }
   } catch (err) {
     alert('Error de red: ' + err.message)
+  } finally {
+    setLoading(false)
   }
-  setLoading(false)
 }
 
   return (
