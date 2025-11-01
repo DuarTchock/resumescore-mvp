@@ -1,6 +1,8 @@
 // api/analyze.js
-import pdf from 'pdf-parse';
-import mammoth from 'mammoth';
+import { createRequire } from 'module';
+const require = createRequire(import.meta.url);
+const pdf = require('pdf-parse');
+const mammoth = require('mammoth');
 
 export const config = { api: { bodyParser: false } };
 
