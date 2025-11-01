@@ -1,9 +1,5 @@
 // api/analyze.js
 import { createRequire } from 'module';
-import { writeFileSync, unlinkSync } from 'fs';
-import { tmpdir } from 'os';
-import { join } from 'path';
-
 const require = createRequire(import.meta.url);
 const PDFParser = require('pdf2json');
 const mammoth = require('mammoth');
@@ -42,45 +38,60 @@ export default async function handler(req, res) {
   try {
     const chunks = [];
     for await (const chunk of req) chunks.push(chunk);
-    const body = Buffer.concat(chunks).toString();
+    const buffer = Buffer.concat(chunks);
 
-    const boundaryMatch = req.headers['content-type']?.match(/boundary=([^;]+)/);
-    if (!boundaryMatch) return res.status(400).json({ error: 'No boundary' });
-    const boundary = boundaryMatch[1];
-    const boundaryStr = `--${boundary}`;
-
-    const parts = body.split(boundaryStr).slice(1, -1);
+    const contentType = req.headers['content-type'] || '';
+    const boundaryMatch = contentType.match(/boundary=(.+?)(?:;|$)/);
+    if (!boundaryMatch) return res.status(400).json({ error: 'No boundary found' });
+    
+    const boundary = boundaryMatch[1].trim();
+    const parts = buffer.toString('binary').split(`--${boundary}`);
+    
     let cvText = '';
     let jdText = '';
 
     for (const part of parts) {
-      const lines = part.trim().split('\r\n');
-      if (lines.length < 4) continue;
+      if (!part || part === '--\r\n' || part === '--') continue;
 
-      const disposition = lines[0];
-      const emptyLineIndex = lines.findIndex(l => l === '');
-      if (emptyLineIndex === -1) continue;
+      const [header, ...bodyParts] = part.split('\r\n\r\n');
+      if (!header) continue;
 
-      const content = lines.slice(emptyLineIndex + 1).join('\r\n').trim();
-      const nameMatch = disposition.match(/name="([^"]+)"/);
-      const filenameMatch = disposition.match(/filename="([^"]+)"/);
+      const nameMatch = header.match(/name="([^"]+)"/);
+      const filenameMatch = header.match(/filename="([^"]+)"/);
       const name = nameMatch?.[1];
-      const filename = filenameMatch?.[1] || '';
+      const filename = filenameMatch?.[1];
 
-      if (name === 'jd') jdText = content;
-      else if (name === 'cv' && content) {
-        const buffer = Buffer.from(content, 'binary');
+      if (!name) continue;
 
-        if (filename.endsWith('.pdf')) {
-          cvText = await extractTextFromPDF(buffer);
-        } else if (filename.endsWith('.docx')) {
-          const result = await mammoth.extractRawText({ buffer });
-          cvText = result.value;
+      const body = bodyParts.join('\r\n\r\n').replace(/\r\n--$/, '');
+
+      if (name === 'jd') {
+        jdText = body.trim();
+      } else if (name === 'cv' && filename) {
+        try {
+          if (filename.endsWith('.pdf')) {
+            const pdfBuffer = Buffer.from(body, 'binary');
+            cvText = await extractTextFromPDF(pdfBuffer);
+          } else if (filename.endsWith('.docx')) {
+            const docxBuffer = Buffer.from(body, 'binary');
+            const result = await mammoth.extractRawText({ buffer: docxBuffer });
+            cvText = result.value;
+          }
+        } catch (fileError) {
+          console.error('File processing error:', fileError);
+          return res.status(400).json({ 
+            error: `Error procesando archivo: ${fileError.message}` 
+          });
         }
       }
     }
 
-    if (!cvText || !jdText) return res.status(400).json({ error: 'Falta CV o JD' });
+    if (!cvText || !jdText) {
+      return res.status(400).json({ 
+        error: 'Falta CV o descripción del puesto',
+        details: { hasCv: !!cvText, hasJd: !!jdText }
+      });
+    }
 
     const clean = (s) => s.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ');
     const cv = clean(cvText);
@@ -118,7 +129,10 @@ export default async function handler(req, res) {
     });
 
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Error: ' + error.message });
+    console.error('Handler error:', error);
+    res.status(500).json({ 
+      error: 'Error del servidor',
+      message: error.message 
+    });
   }
 }
