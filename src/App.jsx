@@ -7,23 +7,26 @@ function App() {
   const [loading, setLoading] = useState(false)
 
   const handleAnalyze = async () => {
-    setLoading(true)
-    const formData = new FormData()
-    formData.append('cv', cvFile)
-    formData.append('jd', jdText)
+  setLoading(true)
+  const formData = new FormData()
+  formData.append('jd', jdText)  // Solo JD (simula CV por ahora)
 
-    try {
-      const res = await fetch('https://resumescore-mvp.vercel.app/api/analyze', {
-        method: 'POST',
-        body: formData
-      })
-      const data = await res.json()
+  try {
+    const res = await fetch('/api/analyze', {
+      method: 'POST',
+      body: formData
+    })
+    const data = await res.json()
+    if (data.success) {
       setScores(data.scores)
-    } catch (err) {
-      alert('Error: ' + err.message)
+    } else {
+      alert('Error: ' + data.error)
     }
-    setLoading(false)
+  } catch (err) {
+    alert('Error de red: ' + err.message)
   }
+  setLoading(false)
+}
 
   return (
     <div className="min-h-screen p-6 max-w-4xl mx-auto">
