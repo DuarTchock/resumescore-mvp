@@ -1,10 +1,31 @@
 // api/analyze.js
 import { createRequire } from 'module';
+import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
+
 const require = createRequire(import.meta.url);
-const pdf = require('pdf-parse');
 const mammoth = require('mammoth');
 
 export const config = { api: { bodyParser: false } };
+
+async function extractTextFromPDF(buffer) {
+  try {
+    const data = new Uint8Array(buffer);
+    const pdf = await getDocument({ data, useSystemFonts: true }).promise;
+    let text = '';
+    
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      const content = await page.getTextContent();
+      const pageText = content.items.map(item => item.str).join(' ');
+      text += pageText + '\n';
+    }
+    
+    return text;
+  } catch (error) {
+    console.error('PDF extraction error:', error);
+    throw new Error('Error al procesar PDF');
+  }
+}
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' });
@@ -42,8 +63,7 @@ export default async function handler(req, res) {
         const buffer = Buffer.from(content, 'binary');
 
         if (filename.endsWith('.pdf')) {
-          const data = await pdf(buffer);
-          cvText = data.text;
+          cvText = await extractTextFromPDF(buffer);
         } else if (filename.endsWith('.docx')) {
           const result = await mammoth.extractRawText({ buffer });
           cvText = result.value;
