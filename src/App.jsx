@@ -23,7 +23,10 @@ function App() {
       body: form
     });
 
-    if (!res.ok) throw new Error('Error en el servidor');
+    if (!res.ok) {
+      const err = await res.text();
+      throw new Error(err || 'Error del servidor');
+    }
 
     const data = await res.json();
 
