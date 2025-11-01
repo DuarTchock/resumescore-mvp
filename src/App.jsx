@@ -13,15 +13,17 @@ function App() {
   }
 
   setLoading(true);
-  const formData = new FormData();
-  formData.append('cv', cvFile);
-  formData.append('jd', jdText);
+  const form = new FormData();
+  form.append('cv', cvFile);
+  form.append('jd', jdText);
 
   try {
     const res = await fetch('/api/analyze', {
       method: 'POST',
-      body: formData
+      body: form
     });
+
+    if (!res.ok) throw new Error('Error en el servidor');
 
     const data = await res.json();
 
@@ -29,7 +31,7 @@ function App() {
       setScores(data.scores);
       setRecommendations(data.recommendations);
     } else {
-      alert('Error: ' + data.error);
+      alert(data.error);
     }
   } catch (err) {
     alert('Error: ' + err.message);
