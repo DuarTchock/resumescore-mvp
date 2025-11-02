@@ -1,6 +1,6 @@
-// api/analyze-ai.js - Análisis con OpenAI
+// api/analyze-ai.js - Análisis con Groq (GRATIS)
 import { createRequire } from 'module';
-import OpenAI from 'openai';
+import Groq from 'groq-sdk';
 
 const require = createRequire(import.meta.url);
 const PDFParser = require('pdf2json');
@@ -8,8 +8,8 @@ const mammoth = require('mammoth');
 
 export const config = { api: { bodyParser: false } };
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
+const groq = new Groq({
+  apiKey: process.env.GROQ_API_KEY
 });
 
 async function extractTextFromPDF(buffer) {
@@ -53,7 +53,7 @@ ${jdText.substring(0, 2000)}
 **CV:**
 ${cvText.substring(0, 3000)}
 
-Responde SOLO con un JSON válido en este formato exacto:
+Responde SOLO con un JSON válido en este formato exacto (sin markdown, sin texto adicional):
 {
   "matchRate": 85,
   "scores": {
@@ -77,8 +77,8 @@ Responde SOLO con un JSON válido en este formato exacto:
 }`;
 
   try {
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
+    const completion = await groq.chat.completions.create({
+      model: "llama-3.3-70b-versatile", // Modelo gratis y potente
       messages: [
         {
           role: "system",
@@ -102,7 +102,7 @@ Responde SOLO con un JSON válido en este formato exacto:
     return analysis;
     
   } catch (error) {
-    console.error('OpenAI API Error:', error);
+    console.error('Groq API Error:', error);
     throw new Error('Error al analizar con AI: ' + error.message);
   }
 }
@@ -111,10 +111,10 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' });
 
   // Verificar API key
-  if (!process.env.OPENAI_API_KEY) {
+  if (!process.env.GROQ_API_KEY) {
     return res.status(500).json({ 
-      error: 'OpenAI API key no configurada',
-      suggestion: 'Configura OPENAI_API_KEY en las variables de entorno de Vercel'
+      error: 'Groq API key no configurada',
+      suggestion: 'Configura GROQ_API_KEY en las variables de entorno de Vercel (gratis en console.groq.com)'
     });
   }
 
@@ -178,6 +178,7 @@ export default async function handler(req, res) {
     }
 
     // Análisis con AI
+    console.log('Iniciando análisis con Groq AI...');
     const aiAnalysis = await analyzeWithAI(cvText, jdText);
     
     const average = Math.round(
@@ -192,7 +193,7 @@ export default async function handler(req, res) {
       average,
       recommendations: aiAnalysis.recommendations,
       reasoning: aiAnalysis.reasoning,
-      poweredBy: 'OpenAI GPT-4'
+      poweredBy: 'Groq Llama 3.3 70B'
     });
 
   } catch (error) {
