@@ -1,4 +1,4 @@
-// src/components/sections/SectionScores.jsx
+// src/components/sections/SectionScores.jsx - CORREGIDO
 import { useState } from 'react';
 import { SectionDetailModal } from '../modals/SectionDetailModal';
 
@@ -27,30 +27,15 @@ export default function SectionScores({ sectionScores, darkMode }) {
 
   return (
     <>
-      <div className={`rounded-3xl shadow-xl border p-8 ${
-        darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-slate-200'
-      }`}>
-        <div className="flex items-center gap-3 mb-6">
-          <div className="w-12 h-12 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-2xl flex items-center justify-center">
-            <svg className="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" />
-            </svg>
-          </div>
-          <div>
-            <h2 className={`text-2xl font-bold ${darkMode ? 'text-gray-200' : 'text-slate-800'}`}>
-              🔥 Vista de Calor por Sección
-            </h2>
-            <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-slate-600'}`}>
-              Haz clic en cada sección para ver el análisis detallado
-            </p>
-          </div>
-        </div>
-        
-        <div className="space-y-4">
-          {Object.entries(sectionScores).map(([section, score]) => (
+      <div className="space-y-4">
+        {Object.entries(sectionScores).map(([section, sectionData]) => {
+          // 🔥 FIX: sectionData es un objeto {score, socraticGuide}, no solo un número
+          const score = typeof sectionData === 'object' ? sectionData.score : sectionData;
+          
+          return (
             <button
               key={section}
-              onClick={() => setSelectedSection({ section, score })}
+              onClick={() => setSelectedSection({ section, score, sectionData })}
               className="w-full group text-left"
             >
               <div className="flex items-center justify-between mb-2">
@@ -80,8 +65,8 @@ export default function SectionScores({ sectionScores, darkMode }) {
                 ></div>
               </div>
             </button>
-          ))}
-        </div>
+          );
+        })}
       </div>
 
       {/* Modal */}
@@ -89,6 +74,7 @@ export default function SectionScores({ sectionScores, darkMode }) {
         <SectionDetailModal
           section={selectedSection.section}
           score={selectedSection.score}
+          sectionData={selectedSection.sectionData}
           darkMode={darkMode}
           onClose={() => setSelectedSection(null)}
         />
