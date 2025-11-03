@@ -291,6 +291,13 @@ IMPORTANTE: Responde AHORA con el JSON completo. NO uses comillas dobles " dentr
           }
 
           ['direct', 'indirect', 'noExperience'].forEach(level => {
+            // Si es string en vez de objeto, convertir
+            if (typeof step.detailedExamples[level] === 'string') {
+              step.detailedExamples[level] = {
+                title: `Opcion ${level}:`,
+                bullets: [step.detailedExamples[level]]
+              };
+            }
             if (!step.detailedExamples[level]) {
               step.detailedExamples[level] = {
                 title: `Opcion ${level}:`,
