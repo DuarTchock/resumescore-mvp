@@ -1,4 +1,4 @@
-// api/analyze-ai.js - VERSIÓN FINAL MEJORADA CON EJEMPLOS ESPECÍFICOS Y MÉTODO SOCRÁTICO
+// api/analyze-ai.js - VERSIÓN CORREGIDA - BUGS #1 Y #2 ARREGLADOS
 import PDFParser from 'pdf2json';
 import mammoth from 'mammoth';
 import Groq from 'groq-sdk';
@@ -65,7 +65,7 @@ async function extractTextFromPDF(buffer) {
   });
 }
 
-// === ANÁLISIS CON GROQ - PROMPT MEJORADO FINAL ===
+// === ANÁLISIS CON GROQ - PROMPT CORREGIDO ===
 async function analyzeWithAI(cvText, jdText) {
   const prompt = `Eres el experto #1 mundial en Sistemas de Seguimiento de Candidatos (ATS - Applicant Tracking Systems) y optimización de CVs para reclutamiento.
 
@@ -80,6 +80,72 @@ ${cvText.substring(0, 3500)}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 🔥 INSTRUCCIONES CRÍTICAS - CUMPLE TODAS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🚨 **BUG FIX #1 - KEYWORDS FALTANTES (CRÍTICO):**
+
+REGLA DE ORO PARA "keywords.*.missing":
+- **SOLO** incluye keywords que:
+  ✓ Están EXPLÍCITAMENTE mencionadas en el JOB DESCRIPTION
+  ✓ NO están en el CV del candidato
+  ✗ NUNCA incluyas keywords del CV que no están en el JD
+  ✗ NUNCA inventes keywords genéricas que no están en el JD
+
+**PROCESO CORRECTO:**
+1. PRIMERO: Extrae TODAS las keywords explícitas del Job Description
+2. SEGUNDO: Extrae TODAS las keywords del CV
+3. TERCERO: missing = keywords que están en JD pero NO en CV
+4. CUARTO: found = keywords que están TANTO en JD como en CV
+
+**EJEMPLO CORRECTO:**
+JD menciona: "Excel, PowerPoint, gestión de equipos, pensamiento crítico"
+CV menciona: "Excel, PowerPoint, Workday, BambooHR"
+
+✅ CORRECTO:
+{
+  "technical": {
+    "found": ["Excel", "PowerPoint"],
+    "missing": []  // Workday/BambooHR NO van aquí porque no están en JD
+  },
+  "soft": {
+    "found": [],
+    "missing": ["gestión de equipos", "pensamiento crítico"]  // Están en JD pero no en CV
+  }
+}
+
+❌ INCORRECTO:
+{
+  "technical": {
+    "found": ["Excel", "PowerPoint"],
+    "missing": ["Workday", "BambooHR"]  // ¡ERROR! Estos NO están en el JD
+  }
+}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🚨 **BUG FIX #2 - ATS BREAKDOWN COMPLETO (CRÍTICO):**
+
+DEBES generar datos COMPLETOS para los 10 ATS en "atsBreakdown".
+NUNCA dejes un ATS sin datos. TODOS deben tener:
+- score
+- strengths (al menos 2)
+- weaknesses (al menos 2)
+- tips (al menos 2, cada uno con tip, example, why)
+
+Los 10 ATS OBLIGATORIOS son:
+1. Workday
+2. Greenhouse
+3. iCIMS
+4. Lever
+5. SAP SuccessFactors
+6. BambooHR
+7. Taleo
+8. Jobvite
+9. Bullhorn
+10. Workable
+
+Si no tienes datos específicos para algún ATS, genera datos genéricos pero NUNCA lo dejes vacío.
+
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 1. **EJEMPLOS ESPECÍFICOS AL JD**: CADA tip, recomendación y paso DEBE incluir ejemplos CONCRETOS que:
@@ -142,16 +208,16 @@ Responde SOLO con JSON válido (sin markdown, sin \`\`\`json). Formato EXACTO:
   ],
   "keywords": {
     "technical": {
-      "found": ["Python", "React", "Node.js", "AWS", "Docker"],
-      "missing": ["Kubernetes", "CI/CD", "Terraform", "GraphQL", "TypeScript"]
+      "found": ["Excel", "PowerPoint"],
+      "missing": ["Python", "SQL"]
     },
     "soft": {
-      "found": ["liderazgo", "comunicación", "trabajo en equipo"],
-      "missing": ["pensamiento crítico", "adaptabilidad", "resolución de problemas"]
+      "found": ["comunicación efectiva", "trabajo en equipo"],
+      "missing": ["liderazgo", "negociación"]
     },
     "industry": {
-      "found": ["fintech", "desarrollo ágil", "APIs RESTful"],
-      "missing": ["DevOps", "microservicios", "arquitectura cloud"]
+      "found": ["recursos humanos", "administración de personal"],
+      "missing": ["gestión del cambio", "cultura organizacional"]
     }
   },
   "atsBreakdown": {
@@ -162,30 +228,116 @@ Responde SOLO con JSON válido (sin markdown, sin \`\`\`json). Formato EXACTO:
       "tips": [
         {
           "tip": "Usa bullets con formato • al inicio de cada logro para mejor extracción",
-          "example": "ADAPTADO A TU JD QUE MENCIONA 'gestión de equipos':\\n\\nSi lideras equipos:\\n• Lideré equipo de 12 desarrolladores aumentando productividad 40% mediante implementación de Scrum\\n• Gestioné presupuesto de $500K optimizando recursos y reduciendo costos 25%\\n• Mentoré 5 junior developers acelerando su onboarding de 3 meses a 6 semanas\\n\\nSi colaboras en equipos:\\n• Colaboré con equipo de 8 personas en 15+ sprints ágiles, entregando features críticas a tiempo\\n• Coordiné con 3 equipos multifuncionales (design, QA, product) para lanzamientos exitosos",
+          "example": "ADAPTADO A TU JD QUE MENCIONA 'gestión de equipos':\\n\\nSi lideras equipos:\\n• Lideré equipo de 12 desarrolladores aumentando productividad 40% mediante implementación de Scrum\\n• Gestioné presupuesto de $500K optimizando recursos y reduciendo costos 25%",
           "why": "Workday ATS prioriza formato de bullets con • para extracción automática de logros y métricas"
-        },
-        {
-          "tip": "Agrega sección 'Certifications' después de Education con año de obtención",
-          "example": "CERTIFICATIONS\\n• AWS Solutions Architect Associate (2024)\\n• Scrum Master Certified - PSM I (2023)\\n• Google Cloud Professional Developer (2023)\\n• MongoDB Certified Developer (2022)",
-          "why": "Workday busca específicamente esta sección para matching automático con requisitos"
         }
       ]
     },
     "Greenhouse": {
       "score": 82,
-      "strengths": ["Experiencia bien estructurada cronológicamente", "Títulos de trabajo claros"],
-      "weaknesses": ["Falta summary ejecutivo al inicio", "Algunas fechas sin formato MM/YYYY"],
+      "strengths": ["Experiencia bien estructurada", "Títulos claros"],
+      "weaknesses": ["Falta summary ejecutivo", "Fechas inconsistentes"],
       "tips": [
         {
-          "tip": "Agrega summary profesional de 3-4 líneas al inicio del CV",
-          "example": "BASADO EN TU EXPERIENCIA Y EL JD:\\n\\nSenior Full-Stack Developer con 8+ años optimizando aplicaciones web de alto tráfico para startups fintech. Experto en React, Node.js y arquitectura cloud (AWS/GCP). Historial comprobado liderando equipos de 12+ personas en ambientes ágiles, aumentando conversión 45% y reduciendo costos de infraestructura $200K/año.",
-          "why": "Greenhouse ATS usa el summary ejecutivo para matching inicial de keywords y fit cultural"
-        },
+          "tip": "Agrega summary profesional de 3-4 líneas al inicio",
+          "example": "Senior Full-Stack Developer con 8+ años optimizando aplicaciones web de alto tráfico.",
+          "why": "Greenhouse usa el summary para matching inicial"
+        }
+      ]
+    },
+    "iCIMS": {
+      "score": 80,
+      "strengths": ["Estructura cronológica clara", "Experiencia cuantificada"],
+      "weaknesses": ["Falta optimización de keywords", "Formato de fechas inconsistente"],
+      "tips": [
         {
-          "tip": "Estandariza todas las fechas a formato MM/YYYY",
-          "example": "ANTES: 'Enero 2020 - Presente' o '2020-actual'\\n\\nDESPUÉS: '01/2020 - Presente'\\n\\nEsto permite a Greenhouse calcular automáticamente años de experiencia total.",
-          "why": "Greenhouse requiere formato consistente MM/YYYY para calcular experiencia automáticamente"
+          "tip": "Incluye keywords del JD en primeras 3 líneas de cada experiencia",
+          "example": "Coloca 'administración de personal' y 'reclutamiento' al inicio de tu descripción.",
+          "why": "iCIMS prioriza keywords en las primeras líneas de cada sección"
+        }
+      ]
+    },
+    "Lever": {
+      "score": 89,
+      "strengths": ["Excelente uso de métricas", "Formato limpio"],
+      "weaknesses": ["Podría agregar más contexto de industria", "Falta sección de proyectos"],
+      "tips": [
+        {
+          "tip": "Agrega contexto de industria en cada bullet",
+          "example": "En sector de servicios de RH: Lideré 120+ procesos de reclutamiento...",
+          "why": "Lever valora contexto de industria para mejor matching"
+        }
+      ]
+    },
+    "SAP SuccessFactors": {
+      "score": 78,
+      "strengths": ["Experiencia relevante en RH", "Certificaciones presentes"],
+      "weaknesses": ["Falta integración con sistemas SAP", "Necesita más keywords técnicas"],
+      "tips": [
+        {
+          "tip": "Menciona experiencia con sistemas empresariales (ERP, HRIS)",
+          "example": "Gestioné nómina en Workday integrado con sistema ERP corporativo.",
+          "why": "SAP SuccessFactors busca experiencia con sistemas empresariales"
+        }
+      ]
+    },
+    "BambooHR": {
+      "score": 90,
+      "strengths": ["Perfil ideal para RH", "Experiencia completa en ciclo de vida del empleado"],
+      "weaknesses": ["Podría enfatizar más cultura organizacional", "Falta mención de onboarding"],
+      "tips": [
+        {
+          "tip": "Incluye experiencia en onboarding y cultura organizacional",
+          "example": "Diseñé programa de onboarding que redujo rotación en primeros 90 días en 35%.",
+          "why": "BambooHR enfatiza cultura y experiencia del empleado"
+        }
+      ]
+    },
+    "Taleo": {
+      "score": 75,
+      "strengths": ["Formato compatible", "Experiencia relevante"],
+      "weaknesses": ["Necesita más keywords de compliance", "Falta énfasis en procesos"],
+      "tips": [
+        {
+          "tip": "Enfatiza cumplimiento normativo (NOM-035, STPS, IMSS)",
+          "example": "Aseguré 100% cumplimiento de NOM-035 y regulaciones STPS en auditorías.",
+          "why": "Taleo prioriza compliance y procesos estructurados"
+        }
+      ]
+    },
+    "Jobvite": {
+      "score": 81,
+      "strengths": ["Experiencia en reclutamiento destacada", "Métricas de contratación"],
+      "weaknesses": ["Falta énfasis en employer branding", "Necesita más social recruiting"],
+      "tips": [
+        {
+          "tip": "Menciona experiencia con redes sociales y employer branding",
+          "example": "Implementé estrategia de employer branding en LinkedIn aumentando aplicaciones 45%.",
+          "why": "Jobvite valora experiencia en reclutamiento social y branding"
+        }
+      ]
+    },
+    "Bullhorn": {
+      "score": 79,
+      "strengths": ["Experiencia en staffing", "Manejo de múltiples clientes"],
+      "weaknesses": ["Falta experiencia con agencias", "Necesita más énfasis en ventas"],
+      "tips": [
+        {
+          "tip": "Destaca experiencia comercial y relación con clientes",
+          "example": "Gestioné cartera de 15 clientes corporativos logrando 95% retención anual.",
+          "why": "Bullhorn es usado por agencias de staffing que valoran skills comerciales"
+        }
+      ]
+    },
+    "Workable": {
+      "score": 86,
+      "strengths": ["Perfil completo", "Experiencia balanceada"],
+      "weaknesses": ["Podría agregar más colaboración con hiring managers", "Falta énfasis en data"],
+      "tips": [
+        {
+          "tip": "Menciona colaboración con hiring managers y uso de data",
+          "example": "Colaboré con 8 hiring managers usando analytics para reducir tiempo de contratación 35%.",
+          "why": "Workable valora colaboración y decisiones basadas en datos"
         }
       ]
     }
@@ -196,124 +348,100 @@ Responde SOLO con JSON válido (sin markdown, sin \`\`\`json). Formato EXACTO:
       "socraticGuide": {
         "intro": "En lugar de solo decir 'qué hiciste', muestra el IMPACTO cuantificable de tu trabajo.",
         "questions": [
-          {
-            "q": "¿Cuántas personas se beneficiaron directamente de tu trabajo?",
-            "hint": "Piensa en: usuarios finales, clientes, miembros del equipo, stakeholders internos"
-          },
-          {
-            "q": "¿Qué métrica específica mejoró gracias a tu contribución?",
-            "hint": "Ejemplos: velocidad (%), calidad (defectos), ingresos ($), satisfacción (NPS), retención (%)"
-          },
-          {
-            "q": "¿Cuánto tiempo o dinero ahorraste a la empresa?",
-            "hint": "Cuantifica: horas/día ahorradas, días/mes, % de reducción de costos, dinero ahorrado"
-          },
-          {
-            "q": "¿Qué problema crítico resolviste y por qué era importante?",
-            "hint": "Contexto: qué estaba fallando, impacto en el negocio, urgencia, stakeholders afectados"
-          },
-          {
-            "q": "¿Cómo lo hiciste? ¿Qué herramientas/metodologías específicas usaste?",
-            "hint": "Menciona: tecnologías del JD, frameworks, procesos, metodologías (Agile, Scrum, etc.)"
-          }
+          "¿Cuántas personas se beneficiaron de tu trabajo?",
+          "¿Qué métrica mejoró gracias a tu contribución específica?",
+          "¿Cuánto tiempo o dinero ahorraste a la empresa?",
+          "¿Qué problema específico resolviste y cómo lo mediste?",
+          "¿Cuál fue el ANTES y el DESPUÉS medible de tu intervención?"
         ],
         "transformation": {
-          "bad": "Desarrollé features para el producto y trabajé con el equipo",
-          "badReason": "Genérico, sin métricas, sin impacto, sin contexto, no menciona tecnologías",
-          "good": "Desarrollé 15 features críticas usando React y TypeScript que aumentaron el engagement 34% y la retención de usuarios en 2.5 meses, impactando a 50K+ usuarios activos y generando $200K adicionales en revenue",
-          "goodReason": "Específico (15 features), tecnologías relevantes (React, TypeScript), métricas cuantificables (34%, 2.5 meses), impacto en negocio ($200K revenue), alcance (50K usuarios)"
+          "bad": "Trabajé en reclutamiento de personal para la empresa",
+          "badReason": "Es vago, sin métricas, no muestra impacto ni diferenciales",
+          "good": "Lideré 120+ procesos de reclutamiento contratando 85 posiciones críticas en <18 días promedio, 62% más rápido que benchmark de industria (45 días)",
+          "goodReason": "Específico, cuantificado, muestra velocidad y benchmarking, demuestra liderazgo"
         },
         "templateSTAR": {
           "context": {
-            "jdMentions": "El JD menciona: 'experiencia en desarrollo full-stack con JavaScript y gestión de equipos'",
-            "cvShows": "Tu CV actual muestra: 'desarrollador con conocimientos en JavaScript'"
+            "jdMentions": "El JD menciona: 'reclutamiento y selección, administración de personal'",
+            "cvShows": "Tu CV muestra: 'Especialista en RH con 3+ años en reclutamiento'"
           },
-          "situation": "Durante el rediseño completo de la plataforma de e-commerce, identificamos problemas críticos de rendimiento que afectaban las conversiones en 30%",
-          "task": "Fui responsable de migrar el frontend a React, optimizar el backend Node.js y liderar un equipo de 3 developers junior",
-          "action": "Implementé arquitectura de microservicios usando React, Redux y Node.js, optimizando rendimiento con lazy loading y code splitting. Coordiné con equipos de design, QA y product, realizando 50+ code reviews y mentoreando al equipo en best practices",
-          "result": "Logré reducir tiempo de carga 60% (de 5s a 2s), aumentar conversiones 22% en 3 meses, impactando a 100K+ usuarios mensuales y generando $500K adicionales en revenue anual. El equipo junior mejoró velocidad de desarrollo 40%"
+          "situacion": "En empresa de servicios con necesidad de reducir tiempo de contratación de 45 a <20 días",
+          "tarea": "Liderar proceso completo de reclutamiento para 85 posiciones críticas en 18 meses",
+          "accion": "Implementé sistema ATS, estandaricé entrevistas por competencias, capacité a 12 reclutadores",
+          "resultado": "Reduje tiempo promedio de contratación de 45 a 18 días (-60%), completé 85 contrataciones con 96% de retención a 6 meses"
         },
         "checklist": [
-          "✅ Empieza con verbo de acción fuerte (Desarrollé, Lideré, Optimicé, Implementé, Arquitecté)",
-          "✅ Incluye número o métrica específica (15 features, 34%, 2.5 meses, 50K usuarios)",
-          "✅ Menciona herramienta/tecnología relevante mencionada en el JD (React, Node.js, AWS)",
-          "✅ Muestra el impacto/resultado cuantificable (engagement, retención, revenue, ahorro)",
-          "✅ Indica tiempo o plazo específico (en 3 meses, durante 2 años, en 6 semanas)",
-          "✅ Menciona a quién impactó (50K usuarios, equipo de 12, 100 clientes, toda la empresa)"
-        ],
-        "jdKeywords": ["desarrollo full-stack", "JavaScript", "React", "gestión de equipos", "metodología ágil"],
-        "yourCurrentText": "Developer en empresa tech trabajando con JavaScript",
-        "improvedVersion": "Senior Full-Stack Developer liderando equipo de 8 personas con metodología ágil, desarrollando aplicaciones React/Node.js que atienden 100K+ usuarios, optimizando arquitectura cloud y reduciendo tiempo de deployment 60%"
+          "✅ Incluye un verbo de acción fuerte (Lideré, Implementé, Optimicé, Reduje)",
+          "✅ Menciona números específicos (cantidad de personas, porcentajes, tiempo)",
+          "✅ Muestra el ANTES y DESPUÉS (de X a Y)",
+          "✅ Incluye el contexto o scope (número de colaboradores, presupuesto, etc)",
+          "✅ Demuestra el impacto en negocio (ahorro, eficiencia, retención)",
+          "✅ Usa keywords del Job Description naturalmente"
+        ]
       }
     },
     "education": {
-      "score": 75,
+      "score": 95,
       "socraticGuide": {
-        "intro": "Maximiza el valor de tu educación mostrando relevancia directa con el puesto y logros destacados.",
+        "intro": "Tu educación es excelente y está bien presentada.",
         "questions": [
-          {
-            "q": "¿Qué proyectos académicos son directamente relevantes para este puesto?",
-            "hint": "Proyectos que usen tecnologías del JD o resuelvan problemas similares"
-          },
-          {
-            "q": "¿Obtuviste algún reconocimiento académico o GPA notable (>3.5)?",
-            "hint": "GPA, becas, premios, dean's list, publicaciones"
-          },
-          {
-            "q": "¿Participaste en actividades extracurriculares relevantes?",
-            "hint": "Clubs técnicos, hackathons, competencias de programación, proyectos open source"
-          },
-          {
-            "q": "¿Tu formación incluye especialización relevante al JD?",
-            "hint": "Especialización, minor, certificaciones académicas, tesis"
-          }
+          "¿Tienes proyectos académicos relevantes para mencionar?",
+          "¿Participaste en investigación o publicaciones?",
+          "¿Obtuviste reconocimientos o becas?",
+          "¿Hiciste prácticas profesionales relevantes?"
         ],
         "transformation": {
-          "bad": "Licenciatura en Ingeniería de Sistemas",
-          "badReason": "Sin detalles, sin GPA, sin especialización, sin proyectos relevantes",
-          "good": "Licenciatura en Ingeniería de Software (GPA 3.8/4.0) con especialización en Arquitectura Cloud y Desarrollo Web. Proyecto destacado: Sistema distribuido de e-commerce que soportó 100K usuarios concurrentes usando microservicios (Node.js, Docker, AWS)",
-          "goodReason": "GPA destacado, especialización relevante, proyecto concreto con tecnologías del JD, métricas de escala"
+          "bad": "Licenciatura en Psicología - UNAM (2016-2020)",
+          "good": "Licenciatura en Psicología Organizacional - UNAM (2016-2020) | Promedio: 9.2/10 | Mención Honorífica"
         },
         "templateSTAR": {
           "context": {
-            "jdMentions": "El JD requiere: 'formación en Computer Science o campo relacionado'",
-            "cvShows": "Tu CV muestra: 'Licenciatura en Ingeniería'"
+            "jdMentions": "El JD menciona: 'Licenciatura en Psicología, Administración o afines'",
+            "cvShows": "Tu CV muestra: 'Lic. Psicología Organizacional - UNAM con Mención Honorífica'"
           },
-          "situation": "El programa requería un proyecto final aplicando desarrollo full-stack y arquitectura escalable",
-          "task": "Desarrollar una plataforma de e-learning que soporte 10K+ usuarios simultáneos",
-          "action": "Diseñé arquitectura de microservicios con React frontend, Node.js backend, MongoDB base de datos y deployment en AWS usando Docker. Implementé autenticación JWT, pagos con Stripe y sistema de notificaciones en tiempo real",
-          "result": "Logré calificación máxima (A+), el proyecto soportó carga de 15K usuarios en pruebas de stress y fue presentado en la conferencia estudiantil de tecnología"
-        }
+          "situacion": "Formación especializada en psicología aplicada al ámbito organizacional",
+          "tarea": "Completar licenciatura con enfoque en gestión de talento y comportamiento organizacional",
+          "accion": "Mantuve promedio 9.2/10, me especialicé en RH, completé proyecto de investigación sobre rotación",
+          "resultado": "Titulada con Mención Honorífica, certificada en competencias de RH aplicadas"
+        },
+        "checklist": [
+          "✅ Incluye promedio si es >8.0",
+          "✅ Menciona reconocimientos (Mención Honorífica, becas, etc)",
+          "✅ Agrega especialización o enfoque si es relevante",
+          "✅ Incluye año de egreso"
+        ]
       }
     },
     "skills": {
-      "score": 68,
+      "score": 88,
       "socraticGuide": {
-        "intro": "Organiza tus skills por categorías y demuestra profundidad de conocimiento.",
+        "intro": "Tus skills están bien organizados, pero pueden tener más impacto.",
         "questions": [
-          {
-            "q": "¿En cuántos proyectos reales has usado cada skill del JD?",
-            "hint": "Cantidad de proyectos, años de experiencia, contexto de uso"
-          },
-          {
-            "q": "¿Cuál es tu nivel de dominio: básico, intermedio, avanzado o experto?",
-            "hint": "Sé honesto: básico (<1 año), intermedio (1-3 años), avanzado (3-5 años), experto (5+ años)"
-          },
-          {
-            "q": "¿Puedes cuantificar tu experiencia con cada tecnología?",
-            "hint": "Líneas de código, proyectos completados, usuarios impactados, certificaciones"
-          },
-          {
-            "q": "¿Qué skills del JD faltan en tu CV pero tienes experiencia?",
-            "hint": "A veces sabemos cosas pero no las ponemos en el CV"
-          }
+          "¿En qué proyectos específicos usaste cada skill?",
+          "¿Qué nivel de dominio tienes en cada herramienta?",
+          "¿Cuánto tiempo llevas usando cada tecnología?",
+          "¿Tienes certificaciones que respalden tus skills?"
         ],
         "transformation": {
-          "bad": "JavaScript, React, Node.js, Python, AWS",
-          "badReason": "Lista plana sin organización, sin niveles, sin contexto de uso",
-          "good": "FRONTEND: React (avanzado, 5+ años), TypeScript (avanzado), Next.js (intermedio, 2 años)\\nBACKEND: Node.js (experto, 6 años), Python/Django (avanzado), GraphQL (intermedio)\\nCLOUD/DEVOPS: AWS (EC2, S3, Lambda - avanzado), Docker (avanzado), Kubernetes (intermedio)\\nDATA: PostgreSQL (avanzado), MongoDB (avanzado), Redis (intermedio)",
-          "goodReason": "Organizado por categorías, niveles de dominio claros, años de experiencia, tecnologías específicas"
-        }
+          "bad": "Excel, PowerPoint, Workday",
+          "good": "Excel Avanzado (macros, Power Query, tablas dinámicas - 3+ años) | Workday (nivel usuario avanzado - certificado) | PowerPoint (presentaciones ejecutivas para C-level)"
+        },
+        "templateSTAR": {
+          "context": {
+            "jdMentions": "El JD menciona: 'Dominio de Excel, PowerPoint'",
+            "cvShows": "Tu CV muestra: 'Excel avanzado, PowerPoint'"
+          },
+          "situacion": "Necesidad de automatizar procesos de nómina y reporting ejecutivo",
+          "tarea": "Dominar Excel avanzado y PowerPoint para análisis y presentaciones",
+          "accion": "Completé certificación Excel Avanzado, creé macros VBA, diseñé dashboards en Power BI",
+          "resultado": "Automaticé cálculo de bonos (ahorro 20hrs/mes), presenté reportes mensuales a Dirección"
+        },
+        "checklist": [
+          "✅ Especifica nivel de dominio (básico, intermedio, avanzado)",
+          "✅ Agrupa por categorías (Técnicas, Blandas, Sistemas)",
+          "✅ Prioriza skills del Job Description al inicio",
+          "✅ Incluye años de experiencia o certificaciones si tienes"
+        ]
       }
     }
   },
@@ -323,98 +451,60 @@ Responde SOLO con JSON válido (sin markdown, sin \`\`\`json). Formato EXACTO:
     "timeToImprove": "2-3 horas",
     "steps": [
       {
-        "action": "Agrega 5 keywords técnicas faltantes críticas que aparecen múltiples veces en el JD",
-        "impact": "+5%",
-        "timeframe": "15 minutos",
-        "priority": "high",
+        "action": "Agrega 3 keywords técnicas críticas del JD: 'gestión de proyectos', 'análisis de datos', 'capacitación'",
+        "impact": "+4%",
+        "timeframe": "20 minutos",
         "detailedExamples": {
-          "context": {
-            "jdMentions": "El JD menciona 7 veces: 'Kubernetes', 'CI/CD', 'Terraform', 'GraphQL' y 'TypeScript'",
-            "cvShows": "Tu CV muestra experiencia en: 'Docker', 'deployment automation', 'JavaScript'"
-          },
+          "context": "El JD enfatiza 'gestión de proyectos' mencionándolo 3 veces, pero tu CV no lo menciona explícitamente aunque SÍ tienes experiencia relacionada.",
           "direct": {
-            "title": "Si has usado estas tecnologías directamente:",
+            "title": "Si TIENES experiencia directa en gestión de proyectos:",
             "bullets": [
-              "Implementé Kubernetes para orquestar 50+ microservicios reduciendo downtime 90% y mejorando escalabilidad horizontal",
-              "Configuré pipelines CI/CD con Jenkins y GitLab automatizando testing y deployments, reduciendo errores de producción 75%",
-              "Desarrollé APIs GraphQL optimizadas procesando 1M+ queries/día con 40% mejor performance vs REST",
-              "Migré codebase de 100K+ líneas de JavaScript a TypeScript mejorando type safety y reduciendo bugs en runtime 60%"
+              "Gestioné proyecto de implementación de nuevo sistema HRIS impactando 220 colaboradores, completado en 3 meses bajo presupuesto",
+              "Lideré 5 proyectos simultáneos de mejora de procesos RH con ROI promedio de 125%",
+              "Coordiné proyecto cross-funcional (RH, IT, Finanzas) para automatización de nómina"
             ]
           },
           "indirect": {
-            "title": "Si tienes experiencia relacionada pero no directa:",
+            "title": "Si tienes experiencia RELACIONADA pero no directa:",
             "bullets": [
-              "Gestioné infraestructura de contenedores Docker en producción, actualmente capacitándome en Kubernetes para orquestación avanzada",
-              "Automaticé procesos de testing y deployment usando scripts y GitHub Actions, reduciendo tiempo de release de 2 días a 4 horas",
-              "Desarrollé APIs RESTful robustas, con conocimiento sólido en optimización de queries aplicable a GraphQL",
-              "Amplia experiencia en JavaScript ES6+ y desarrollo tipado, en transición activa a TypeScript en proyectos actuales"
+              "Lideré implementación de nuevo sistema de control de incidencias que impactó 220 colaboradores durante 4 meses",
+              "Coordiné con 3 áreas (IT, Finanzas, Operaciones) para automatizar cálculo de bonos",
+              "Planifiqué y ejecuté renovación de políticas de compensación en 6 fases durante 2 trimestres"
             ]
           },
           "noExperience": {
-            "title": "Si no tienes experiencia directa (sé honesto pero destaca transferibles):",
+            "title": "Si NO tienes experiencia directa:",
             "bullets": [
-              "Sólida experiencia en DevOps y automatización de infraestructura, familiarizado con conceptos de orquestación de contenedores (Kubernetes es objetivo de capacitación inmediata)",
-              "Experiencia implementando automatización de procesos, entendimiento claro de principios CI/CD, capacidad de ramp-up rápido en herramientas específicas",
-              "Fuerte background en diseño de APIs RESTful escalables, conocimiento teórico de GraphQL y ventajas para optimización de queries",
-              "Experto en JavaScript moderno, en proceso de certificación TypeScript (completando curso oficial de Microsoft)"
+              "Colaboré en 3 proyectos multidisciplinarios de RH aportando análisis de datos y seguimiento",
+              "Participé activamente en planning y retrospectivas de proyectos de mejora continua",
+              "Apoyé coordinación de proyecto de certificación NOM-035 gestionando documentación y timeline"
             ]
           },
-          "proTip": "Siempre incluye MÉTRICAS: números, porcentajes, tiempo. Fórmula ganadora: [Acción específica] + [Resultado cuantificable] + [Tiempo/Impacto en negocio]"
-        },
-        "keywords": ["Kubernetes", "CI/CD", "Terraform", "GraphQL", "TypeScript"]
+          "proTip": "Usa un verbo de LIDERAZGO incluso en colaboración: 'Coordiné', 'Facilité', 'Impulse' tienen más peso que 'Apoyé' o 'Participé'."
+        }
       },
       {
-        "action": "Cuantifica 10 logros actuales agregando métricas específicas (números, %, tiempo)",
-        "impact": "+4%",
+        "action": "Cuantifica 3 logros actuales agregando métricas de impacto (%, tiempo, $)",
+        "impact": "+3%",
         "timeframe": "30 minutos",
-        "priority": "high",
         "detailedExamples": {
-          "context": {
-            "jdMentions": "El JD busca evidencia cuantificable de: 'mejora de procesos', 'optimización de rendimiento', 'impacto en negocio'",
-            "cvShows": "Tu CV tiene frases como: 'Mejoré la aplicación', 'Optimicé procesos', 'Lideré proyecto'"
-          },
+          "context": "Tienes bullets como 'Administré pre-nómina de colaboradores'. Agregar números específicos aumenta credibilidad.",
           "direct": {
-            "title": "Si tienes métricas específicas:",
+            "title": "Transforma bullets vagos en específicos:",
             "bullets": [
-              "Optimicé 5 queries críticas en PostgreSQL reduciendo tiempo de respuesta de 3s a 200ms (93% mejora), impactando 100K+ usuarios diarios",
-              "Refactoricé módulo de pagos aumentando tasa de éxito de 85% a 98.5% (15% mejora) y reduciendo chargebacks $50K/mes",
-              "Implementé sistema de caching con Redis disminuyendo carga del servidor 70% y ahorrando $2K/mes en infraestructura AWS",
-              "Lideré migración a microservicios reduciendo tiempo de deployment de 4 horas a 15 minutos (93% más rápido), mejorando frecuencia de releases de 1x/mes a 3x/semana"
+              "ANTES: 'Resolví conflictos laborales' → DESPUÉS: 'Resolví 45 conflictos laborales mediante mediación, logrando acuerdos en 96% de casos (solo 2 llegaron a legal)'",
+              "ANTES: 'Lideré procesos de reclutamiento' → DESPUÉS: 'Lideré 120+ procesos de reclutamiento contratando 85 posiciones en <18 días promedio, 62% más rápido que benchmark'",
+              "ANTES: 'Reduje ausentismo' → DESPUÉS: 'Implementé sistema de control reduciendo ausentismo injustificado de 12% a 4.8% (-60%) en 6 meses'"
             ]
           },
-          "indirect": {
-            "title": "Si necesitas estimar métricas (hazlo razonablemente):",
-            "bullets": [
-              "Mejoré rendimiento de la aplicación implementando lazy loading, logrando reducción estimada de 40% en tiempo de carga inicial",
-              "Optimicé procesos de deployment mediante automatización, reduciendo tiempo de release de 2 horas a 30 minutos",
-              "Refactoricé código legacy eliminando aproximadamente 30% de código duplicado y mejorando mantenibilidad del sistema",
-              "Implementé mejores prácticas de testing aumentando cobertura de 45% a 80%, reduciendo bugs reportados en producción"
-            ]
-          },
-          "noExperience": {
-            "title": "Si no tienes datos exactos (enfócate en proceso y aprendizaje):",
-            "bullets": [
-              "Identifiqué 10+ oportunidades de optimización en el codebase actual usando herramientas de profiling, proponiendo mejoras basadas en best practices",
-              "Documenté análisis de rendimiento completo usando Lighthouse y Chrome DevTools, identificando cuellos de botella y áreas de mejora prioritarias",
-              "Implementé sistema de performance monitoring con herramientas como New Relic, estableciendo baseline para futuras optimizaciones",
-              "Lideré iniciativa de code review incrementando calidad de código y estableciendo estándares de desarrollo en el equipo"
-            ]
-          },
-          "proTip": "Si no tienes números exactos, usa estimaciones razonables. Palabras clave: 'aproximadamente', 'más de', 'hasta', 'cerca de'. Ejemplo: 'Optimicé queries reduciendo tiempo de respuesta en más de 50%'"
-        },
-        "keywords": ["métricas", "KPIs", "resultados cuantificables", "impacto en negocio"]
+          "proTip": "Fórmula ganadora: [Verbo de acción] + [qué hiciste] + [métrica numérica] + [impacto en negocio] + [tiempo]"
+        }
       }
     ]
   },
   "atsDetectionGuide": {
-    "indicators": [
-      "Portal de aplicación con campos estandarizados para skills y experiencia (no solo upload de CV)",
-      "Subida de archivo PDF/DOCX seguida de formularios adicionales que replican info del CV",
-      "Preguntas de screening automáticas con requisitos binarios (ej: '¿Tienes 5+ años de experiencia en X?')",
-      "Sistema de 'match score' o porcentaje de compatibilidad visible al aplicar",
-      "Portal pide parsear tu CV automáticamente para llenar campos del formulario"
-    ],
-    "commonSystems": {
+    "commonByIndustry": {
+      "tech": ["Greenhouse", "Lever", "Workable"],
       "startups": ["Greenhouse", "Lever", "Workable", "Ashby"],
       "enterprises": ["Workday", "SAP SuccessFactors", "Taleo", "Oracle HCM"],
       "agencies": ["Bullhorn", "Jobvite", "iCIMS"]
@@ -427,7 +517,7 @@ Responde SOLO con JSON válido (sin markdown, sin \`\`\`json). Formato EXACTO:
       "Si la aplicación es solo enviar email con CV adjunto → probablemente NO hay ATS"
     ]
   },
-  "reasoning": "El CV muestra experiencia técnica sólida con 5+ años en desarrollo full-stack. Las áreas prioritarias de mejora son: (1) agregar 5 keywords críticas del JD (Kubernetes, CI/CD, TypeScript) que aparecen múltiples veces pero faltan en el CV, (2) cuantificar 10 logros actuales con métricas específicas para demostrar impacto en negocio, (3) agregar summary ejecutivo de 3-4 líneas que capture propuesta de valor. Con estas mejoras, el score puede aumentar de 85% actual a 95% potencial en 2-3 horas de trabajo."
+  "reasoning": "El CV muestra experiencia sólida de 3+ años en RH y administración de personal. Las áreas prioritarias de mejora son: (1) agregar keywords específicas del JD que faltan ('gestión de proyectos', 'capacitación', 'desarrollo organizacional'), (2) cuantificar logros existentes con métricas más específicas, (3) enfatizar experiencia comercial mencionada en el JD. Con estas mejoras, el score puede aumentar de 85% actual a 95% potencial en 2-3 horas de trabajo."
 }`;
 
   try {
@@ -436,7 +526,7 @@ Responde SOLO con JSON válido (sin markdown, sin \`\`\`json). Formato EXACTO:
       messages: [
         {
           role: "system",
-          content: "Eres el experto #1 mundial en ATS (Applicant Tracking Systems - Sistemas de Seguimiento de Candidatos) y optimización de CVs para reclutamiento. SIEMPRE generas análisis COMPLETOS con TODOS los campos requeridos. CADA ejemplo DEBE ser ESPECÍFICO al Job Description y CV proporcionados, NO genérico. Incluyes MÉTRICAS cuantificables en todos los ejemplos. Los ejemplos deben ser COPIABLES por el candidato. Respondes SOLO con JSON válido sin markdown."
+          content: "Eres el experto #1 mundial en ATS (Applicant Tracking Systems - Sistemas de Seguimiento de Candidatos) y optimización de CVs para reclutamiento. CRÍTICO: En 'keywords.*.missing' SOLO incluye keywords que están en el JOB DESCRIPTION pero NO en el CV. NUNCA incluyas keywords del CV que no están en el JD. CRÍTICO: Genera datos COMPLETOS para los 10 ATS en atsBreakdown (Workday, Greenhouse, iCIMS, Lever, SAP SuccessFactors, BambooHR, Taleo, Jobvite, Bullhorn, Workable). NUNCA dejes un ATS vacío. Respondes SOLO con JSON válido sin markdown."
         },
         {
           role: "user",
@@ -481,14 +571,62 @@ Responde SOLO con JSON válido (sin markdown, sin \`\`\`json). Formato EXACTO:
       };
     }
 
-    // Validar que atsBreakdown tenga tips con ejemplos
-    if (analysis.atsBreakdown) {
-      Object.keys(analysis.atsBreakdown).forEach(ats => {
-        if (!analysis.atsBreakdown[ats].tips || !Array.isArray(analysis.atsBreakdown[ats].tips)) {
-          analysis.atsBreakdown[ats].tips = [];
-        }
-      });
+    // 🔥 BUG FIX #2: Validar que TODOS los 10 ATS tengan datos completos
+    const requiredATS = [
+      'Workday', 'Greenhouse', 'iCIMS', 'Lever', 'SAP SuccessFactors',
+      'BambooHR', 'Taleo', 'Jobvite', 'Bullhorn', 'Workable'
+    ];
+
+    if (!analysis.atsBreakdown) {
+      analysis.atsBreakdown = {};
     }
+
+    requiredATS.forEach(ats => {
+      if (!analysis.atsBreakdown[ats]) {
+        // Crear datos por defecto si faltan
+        const score = analysis.scores?.[ats] || 75;
+        analysis.atsBreakdown[ats] = {
+          score: score,
+          strengths: [
+            "Formato compatible con estándares ATS",
+            "Keywords relevantes presentes"
+          ],
+          weaknesses: [
+            "Podría optimizar distribución de keywords",
+            "Algunos bullets sin métricas cuantificables"
+          ],
+          tips: [
+            {
+              tip: "Agrega métricas cuantificables en cada bullet point",
+              example: "En lugar de 'Gestioné personal', usa 'Gestioné equipo de 25 personas aumentando productividad 30%'",
+              why: `${ats} prioriza logros medibles para mejor matching con requisitos`
+            },
+            {
+              tip: "Incluye keywords del JD en primeras líneas de cada sección",
+              example: "Coloca las palabras clave más importantes del puesto al inicio de tu experiencia",
+              why: `${ats} da más peso a keywords encontradas en el primer tercio del documento`
+            }
+          ]
+        };
+      } else {
+        // Validar que tenga todos los campos
+        if (!analysis.atsBreakdown[ats].tips || !Array.isArray(analysis.atsBreakdown[ats].tips)) {
+          analysis.atsBreakdown[ats].tips = [
+            {
+              tip: "Optimiza formato para mejor extracción automática",
+              example: "Usa bullets con • y estructura clara en cada sección",
+              why: `${ats} extrae mejor información con formato estructurado`
+            }
+          ];
+        }
+        if (!analysis.atsBreakdown[ats].strengths || analysis.atsBreakdown[ats].strengths.length === 0) {
+          analysis.atsBreakdown[ats].strengths = ["Formato compatible", "Keywords presentes"];
+        }
+        if (!analysis.atsBreakdown[ats].weaknesses || analysis.atsBreakdown[ats].weaknesses.length === 0) {
+          analysis.atsBreakdown[ats].weaknesses = ["Optimización de keywords", "Métricas en algunos bullets"];
+        }
+      }
+    });
 
     // Validar que sectionScores tenga socraticGuide
     if (analysis.sectionScores) {
