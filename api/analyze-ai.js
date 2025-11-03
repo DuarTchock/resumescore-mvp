@@ -1,4 +1,4 @@
-// api/analyze-ai.js - Análisis con Groq (GRATIS)
+// api/analyze-ai.js - Análisis completo con Groq
 import { createRequire } from 'module';
 import Groq from 'groq-sdk';
 
@@ -41,19 +41,15 @@ async function extractTextFromPDF(buffer) {
 async function analyzeWithAI(cvText, jdText) {
   const prompt = `Eres un experto en sistemas ATS (Applicant Tracking Systems) y optimización de CVs.
 
-Analiza el siguiente CV contra la descripción del puesto (Job Description) y proporciona:
-
-1. Un porcentaje de coincidencia general (0-100)
-2. Scores específicos para estos 10 ATS: Workday, Greenhouse, iCIMS, Lever, SAP SuccessFactors, BambooHR, Taleo, Jobvite, Bullhorn, Workable
-3. 3-5 recomendaciones específicas y accionables para mejorar el CV
+Analiza el siguiente CV contra la descripción del puesto (Job Description) y proporciona un análisis DETALLADO.
 
 **Job Description:**
-${jdText.substring(0, 2000)}
+${jdText.substring(0, 2500)}
 
 **CV:**
-${cvText.substring(0, 3000)}
+${cvText.substring(0, 3500)}
 
-Responde SOLO con un JSON válido en este formato exacto (sin markdown, sin texto adicional):
+Responde SOLO con un JSON válido en este formato exacto (sin markdown):
 {
   "matchRate": 85,
   "scores": {
@@ -69,20 +65,56 @@ Responde SOLO con un JSON válido en este formato exacto (sin markdown, sin text
     "Workable": 86
   },
   "recommendations": [
-    "Agrega la palabra clave 'gestión de equipos' que aparece 3 veces en el JD",
-    "Incluye métricas cuantificables con porcentajes",
-    "Reformatea las fechas a MM/YYYY para mejor parsing"
+    {
+      "priority": "critical",
+      "text": "Agrega la palabra clave 'gestión de equipos' que aparece 5 veces en el JD",
+      "impact": "high"
+    },
+    {
+      "priority": "important",
+      "text": "Incluye métricas cuantificables con porcentajes",
+      "impact": "medium"
+    }
   ],
-  "reasoning": "Explicación breve del análisis"
+  "strengths": [
+    "Experiencia relevante en el sector",
+    "Habilidades técnicas alineadas",
+    "Formación académica adecuada"
+  ],
+  "keywords": {
+    "technical": ["Python", "SQL", "AWS"],
+    "soft": ["Liderazgo", "Comunicación"],
+    "missing": ["Docker", "Kubernetes", "CI/CD"]
+  },
+  "atsBreakdown": {
+    "Workday": {
+      "positives": ["Formato cronológico correcto", "Fechas bien formateadas"],
+      "negatives": ["Falta sección de certificaciones"],
+      "tips": ["Usa formato MM/YYYY para fechas"]
+    },
+    "Taleo": {
+      "positives": ["Texto plano sin tablas"],
+      "negatives": ["Muchas columnas detectadas", "Formato complejo"],
+      "tips": ["Simplifica el diseño", "Evita tablas"]
+    }
+  },
+  "sectionScores": {
+    "experience": 90,
+    "education": 85,
+    "skills": 75,
+    "summary": 80
+  },
+  "estimatedImprovement": 12,
+  "reasoning": "Explicación del análisis"
 }`;
 
   try {
     const completion = await groq.chat.completions.create({
-      model: "llama-3.3-70b-versatile", // Modelo gratis y potente
+      model: "llama-3.3-70b-versatile",
       messages: [
         {
           role: "system",
-          content: "Eres un experto en ATS y optimización de CVs. Respondes SOLO con JSON válido, sin markdown ni texto adicional."
+          content: "Eres un experto en ATS y optimización de CVs. Respondes SOLO con JSON válido, sin markdown ni texto adicional. Proporciona análisis detallados y accionables."
         },
         {
           role: "user",
@@ -90,14 +122,11 @@ Responde SOLO con un JSON válido en este formato exacto (sin markdown, sin text
         }
       ],
       temperature: 0.3,
-      max_tokens: 1000
+      max_tokens: 2000
     });
 
     const responseText = completion.choices[0].message.content.trim();
-    
-    // Limpiar markdown si viene con ```json
     const jsonText = responseText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-    
     const analysis = JSON.parse(jsonText);
     return analysis;
     
@@ -110,11 +139,10 @@ Responde SOLO con un JSON válido en este formato exacto (sin markdown, sin text
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' });
 
-  // Verificar API key
   if (!process.env.GROQ_API_KEY) {
     return res.status(500).json({ 
       error: 'Groq API key no configurada',
-      suggestion: 'Configura GROQ_API_KEY en las variables de entorno de Vercel (gratis en console.groq.com)'
+      suggestion: 'Configura GROQ_API_KEY en las variables de entorno de Vercel'
     });
   }
 
@@ -177,8 +205,6 @@ export default async function handler(req, res) {
       });
     }
 
-    // Análisis con AI
-    console.log('Iniciando análisis con Groq AI...');
     const aiAnalysis = await analyzeWithAI(cvText, jdText);
     
     const average = Math.round(
@@ -192,6 +218,11 @@ export default async function handler(req, res) {
       scores: aiAnalysis.scores,
       average,
       recommendations: aiAnalysis.recommendations,
+      strengths: aiAnalysis.strengths || [],
+      keywords: aiAnalysis.keywords || {},
+      atsBreakdown: aiAnalysis.atsBreakdown || {},
+      sectionScores: aiAnalysis.sectionScores || {},
+      estimatedImprovement: aiAnalysis.estimatedImprovement || 0,
       reasoning: aiAnalysis.reasoning,
       poweredBy: 'Groq Llama 3.3 70B'
     });
