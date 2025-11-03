@@ -1,4 +1,4 @@
-// api/analyze-ai.js - Análisis completo mejorado con prompt detallado
+// api/analyze-ai.js - VERSIÓN MEJORADA CON EJEMPLOS ESPECÍFICOS Y MÉTODO SOCRÁTICO
 import PDFParser from 'pdf2json';
 import mammoth from 'mammoth';
 import Groq from 'groq-sdk';
@@ -50,7 +50,7 @@ async function extractTextFromPDF(buffer) {
             }
           });
         });
-        text = text.replace(/\s+/g, ' ').trim();
+        text = text.replace(/\\s+/g, ' ').trim();
         resolve(text);
       } catch (err) {
         console.error('Error en dataReady:', err);
@@ -65,9 +65,9 @@ async function extractTextFromPDF(buffer) {
   });
 }
 
-// === ANÁLISIS CON GROQ - PROMPT MEJORADO Y DETALLADO ===
+// === ANÁLISIS CON GROQ - PROMPT MEJORADO ===
 async function analyzeWithAI(cvText, jdText) {
-  const prompt = `Eres el experto #1 mundial en ATS y optimización de CVs. Analiza este CV contra la Job Description y genera un reporte COMPLETO y DETALLADO.
+  const prompt = `Eres el experto #1 mundial en Sistemas de Seguimiento de Candidatos (ATS - Applicant Tracking Systems) y optimización de CVs. Analiza este CV contra el Job Description y genera un reporte COMPLETO, DETALLADO y 100% ACCIONABLE.
 
 **JOB DESCRIPTION:**
 ${jdText.substring(0, 2500)}
@@ -76,29 +76,27 @@ ${jdText.substring(0, 2500)}
 ${cvText.substring(0, 3500)}
 
 INSTRUCCIONES CRÍTICAS:
-1. Analiza TODOS los aspectos: keywords, experiencia, educación, skills técnicos y blandos
-2. Genera AL MENOS 10-15 recomendaciones específicas y accionables con EJEMPLOS concretos
-3. Identifica MÍNIMO 5 fortalezas del candidato
-4. Lista keywords encontrados Y faltantes para cada categoría
-5. Proporciona scores realistas para TODOS los 10 ATS
-6. Crea una ruta de mejora con pasos específicos
-7. Genera breakdown detallado para cada ATS
+
+1. **EJEMPLOS ESPECÍFICOS**: CADA tip, recomendación y paso DEBE incluir ejemplos CONCRETOS basados en el JD y CV específicos del candidato
+2. **MÉTODO SOCRÁTICO**: Para cada sección del CV, proporciona preguntas que guíen al candidato a descubrir sus fortalezas
+3. **TEXTO COPIABLE**: Proporciona ejemplos que el candidato pueda copiar y pegar directamente en su CV
+4. **ADAPTADO AL CANDIDATO**: Los ejemplos deben reflejar la experiencia actual mostrada en el CV
 
 Responde SOLO con JSON válido (sin markdown). Formato EXACTO:
 
 {
-  "matchRate": 78,
+  "matchRate": 85,
   "scores": {
-    "Workday": 82,
-    "Greenhouse": 79,
-    "iCIMS": 75,
-    "Lever": 81,
-    "SAP SuccessFactors": 73,
-    "BambooHR": 85,
-    "Taleo": 71,
-    "Jobvite": 77,
-    "Bullhorn": 74,
-    "Workable": 80
+    "Workday": 88,
+    "Greenhouse": 82,
+    "iCIMS": 80,
+    "Lever": 89,
+    "SAP SuccessFactors": 78,
+    "BambooHR": 90,
+    "Taleo": 75,
+    "Jobvite": 81,
+    "Bullhorn": 79,
+    "Workable": 86
   },
   "recommendations": [
     {
@@ -106,144 +104,160 @@ Responde SOLO con JSON válido (sin markdown). Formato EXACTO:
       "text": "Agrega la keyword 'gestión de proyectos ágiles' que aparece 4 veces en el JD pero 0 en tu CV",
       "impact": "high",
       "section": "experience",
-      "example": "• Lideré 8 proyectos ágiles con equipos de 12+ personas, logrando entregas 25% más rápidas usando metodología Scrum"
-    },
-    {
-      "priority": "important",
-      "text": "Incluye métricas cuantificables en tu experiencia actual",
-      "impact": "medium",
-      "section": "experience",
-      "example": "• Aumenté conversión de ventas en 34% implementando estrategia de email marketing automatizado"
-    },
-    {
-      "priority": "critical",
-      "text": "Agrega certificación en [tecnología del JD] para aumentar credibilidad",
-      "impact": "high",
-      "section": "education",
-      "example": "Certificación profesional en AWS Solutions Architect (2024)"
+      "example": "• Lideré 8 proyectos ágiles con equipos de 12+ personas usando Scrum, logrando entregas 25% más rápidas y reduciendo bugs en 40%"
     }
   ],
   "strengths": [
     "Experiencia sólida de 5+ años en desarrollo de software",
     "Dominio comprobado de Python, React y Node.js",
-    "Historial de liderazgo de equipos multidisciplinarios",
-    "Certificaciones relevantes en tecnologías cloud",
-    "Experiencia internacional en empresas Fortune 500"
+    "Historial de liderazgo de equipos multidisciplinarios"
   ],
   "keywords": {
     "technical": {
       "found": ["Python", "React", "Node.js", "AWS", "Docker"],
-      "missing": ["Kubernetes", "CI/CD", "Terraform", "GraphQL"]
+      "missing": ["Kubernetes", "CI/CD", "Terraform"]
     },
     "soft": {
-      "found": ["liderazgo", "comunicación", "resolución de problemas"],
-      "missing": ["pensamiento crítico", "adaptabilidad", "trabajo en equipo"]
+      "found": ["liderazgo", "comunicación"],
+      "missing": ["pensamiento crítico", "adaptabilidad"]
     },
     "industry": {
-      "found": ["fintech", "desarrollo ágil", "arquitectura de software"],
-      "missing": ["DevOps", "microservicios", "seguridad informática"]
+      "found": ["fintech", "desarrollo ágil"],
+      "missing": ["DevOps", "microservicios"]
     }
   },
   "atsBreakdown": {
     "Workday": {
-      "score": 82,
-      "strengths": ["Formato compatible", "Keywords bien distribuidas"],
-      "weaknesses": ["Falta sección de certificaciones", "Bullets sin métricas"],
-      "tips": ["Usa bullets con formato • al inicio", "Agrega sección 'Certifications'"]
+      "score": 88,
+      "strengths": ["Formato compatible con estándares ATS", "Keywords bien distribuidas"],
+      "weaknesses": ["Falta sección de certificaciones", "Algunos bullets sin métricas"],
+      "tips": [
+        {
+          "tip": "Usa bullets con formato • al inicio de cada logro",
+          "example": "BASADO EN TU JD QUE MENCIONA 'gestión de equipos':\\n\\n• Lideré equipo de 12 desarrolladores aumentando productividad 40%\\n• Gestioné presupuesto de $500K optimizando recursos 25%\\n• Mentoré 5 junior developers acelerando onboarding 50%",
+          "why": "Workday ATS prioriza formato de bullets para extracción automática"
+        },
+        {
+          "tip": "Agrega sección 'Certifications' después de Education",
+          "example": "CERTIFICATIONS\\n• AWS Solutions Architect Associate (2024)\\n• Scrum Master Certified (2023)\\n• Google Cloud Professional (2023)",
+          "why": "Workday busca específicamente esta sección"
+        }
+      ]
     },
     "Greenhouse": {
-      "score": 79,
-      "strengths": ["Experiencia bien estructurada", "Educación completa"],
-      "weaknesses": ["Falta summary ejecutivo", "Skills desorganizados"],
-      "tips": ["Agrega summary de 3-4 líneas al inicio", "Categoriza skills por nivel"]
-    },
-    "iCIMS": {
-      "score": 75,
-      "strengths": ["Títulos de trabajo claros"],
-      "weaknesses": ["Formato de fechas inconsistente", "Gaps laborales sin explicar"],
-      "tips": ["Usa formato MM/YYYY consistente", "Explica gaps > 3 meses"]
-    },
-    "Lever": {
-      "score": 81,
-      "strengths": ["Keywords relevantes presentes", "Experiencia cuantificada"],
-      "weaknesses": ["Falta enlace a portfolio/LinkedIn"],
-      "tips": ["Agrega URL de LinkedIn y portfolio", "Incluye proyectos destacados"]
-    },
-    "SAP SuccessFactors": {
-      "score": 73,
-      "strengths": ["Educación formal sólida"],
-      "weaknesses": ["Falta desarrollo profesional reciente", "Sin soft skills"],
-      "tips": ["Agrega cursos/certificaciones 2023-2024", "Menciona soft skills en bullets"]
-    },
-    "BambooHR": {
-      "score": 85,
-      "strengths": ["Cultura fit evidente", "Valores alineados"],
-      "weaknesses": ["Podría mejorar storytelling"],
-      "tips": ["Cuenta historia de carrera", "Muestra pasión por la industria"]
-    },
-    "Taleo": {
-      "score": 71,
-      "strengths": ["Estructura básica correcta"],
-      "weaknesses": ["Falta keywords críticas", "Formato muy simple"],
-      "tips": ["Repite keywords del JD naturalmente", "Usa secciones adicionales"]
-    },
-    "Jobvite": {
-      "score": 77,
-      "strengths": ["Experiencia relevante clara"],
-      "weaknesses": ["Falta social proof", "Sin referencias"],
-      "tips": ["Agrega testimonios/logros reconocidos", "Incluye 'References available'"]
-    },
-    "Bullhorn": {
-      "score": 74,
-      "strengths": ["Experiencia técnica sólida"],
-      "weaknesses": ["Falta soft skills", "Sin actividades extracurriculares"],
-      "tips": ["Menciona voluntariados/hobbies relevantes", "Incluye idiomas"]
-    },
-    "Workable": {
-      "score": 80,
-      "strengths": ["CV conciso y directo", "Fácil de escanear"],
-      "weaknesses": ["Podría tener más detalle en logros"],
-      "tips": ["Expande logros clave con contexto", "Usa método STAR"]
+      "score": 82,
+      "strengths": ["Experiencia bien estructurada"],
+      "weaknesses": ["Falta summary ejecutivo"],
+      "tips": [
+        {
+          "tip": "Agrega summary de 3-4 líneas al inicio",
+          "example": "Senior Full-Stack Developer con 8+ años optimizando aplicaciones web de alto tráfico. Experto en React, Node.js y arquitectura cloud (AWS). Historial comprobado aumentando conversión 45% y liderando equipos de 12+ personas en ambientes ágiles.",
+          "why": "Greenhouse ATS usa el summary para matching inicial"
+        }
+      ]
     }
   },
   "sectionScores": {
-    "experience": 82,
-    "education": 75,
-    "skills": 68,
-    "summary": 60
+    "experience": {
+      "score": 82,
+      "socraticGuide": {
+        "questions": [
+          "¿Cuántas personas se beneficiaron directamente de tu trabajo?",
+          "¿Qué métrica específica mejoró gracias a tu contribución?",
+          "¿Cuánto tiempo o dinero ahorraste a la empresa?",
+          "¿Qué problema crítico resolviste y cómo?"
+        ],
+        "badExample": "Desarrollé features para el producto y trabajé con el equipo",
+        "goodExample": "Desarrollé 15 features críticas que aumentaron engagement 34% y retención de usuarios en 2.5 meses, impactando a 50K+ usuarios activos",
+        "templateSTAR": {
+          "situacion": "El proyecto necesitaba [problema específico del JD]",
+          "tarea": "Me asignaron [tu responsabilidad relacionada al JD]",
+          "accion": "Implementé [solución usando skills del JD] liderando [equipo/proceso]",
+          "resultado": "Logré [métrica cuantificable] en [timeframe], generando [impacto en negocio]"
+        },
+        "jdKeywords": ["gestión de equipos", "metodología ágil", "optimización"],
+        "yourCurrentText": "Developer en empresa tech",
+        "improvedVersion": "Senior Developer liderando equipo de 8 personas con metodología ágil, optimizando arquitectura y reduciendo tiempo de deployment 60%"
+      }
+    },
+    "education": {
+      "score": 75,
+      "socraticGuide": {
+        "questions": [
+          "¿Qué proyectos académicos son relevantes para este puesto?",
+          "¿Obtuviste algún reconocimiento o GPA notable?",
+          "¿Participaste en actividades extracurriculares relevantes?"
+        ],
+        "badExample": "Licenciatura en Ingeniería",
+        "goodExample": "Licenciatura en Ingeniería de Software (GPA 3.8/4.0) con especialización en Arquitectura Cloud. Proyecto destacado: Sistema distribuido que soportó 100K usuarios concurrentes.",
+        "templateSTAR": {
+          "situacion": "El JD requiere formación en [área específica]",
+          "tarea": "Completé [grado/certificación] enfocándome en [especialización]",
+          "accion": "Desarrollé [proyecto final/tesis] aplicando [tecnologías del JD]",
+          "resultado": "Logré [GPA/reconocimiento] y [impacto del proyecto]"
+        }
+      }
+    },
+    "skills": {
+      "score": 68,
+      "socraticGuide": {
+        "questions": [
+          "¿En qué proyectos reales has usado cada skill?",
+          "¿Cuál es tu nivel de dominio: básico, intermedio o avanzado?",
+          "¿Puedes cuantificar tu experiencia con cada tecnología?"
+        ],
+        "badExample": "Python, React, SQL",
+        "goodExample": "Python (5+ años, 10 proyectos prod) • React (3 años, apps con 50K+ usuarios) • SQL (optimización de queries, reducción de tiempo 70%)",
+        "templateSTAR": {
+          "situacion": "El JD prioriza [skill específica]",
+          "tarea": "He usado [skill] en [número] proyectos durante [tiempo]",
+          "accion": "Recientemente [proyecto específico donde usaste el skill]",
+          "resultado": "Logré [métrica] demostrando dominio avanzado"
+        }
+      }
+    },
+    "summary": {
+      "score": 60,
+      "socraticGuide": {
+        "questions": [
+          "¿Qué te hace único para ESTE puesto específico?",
+          "¿Cuál es tu propuesta de valor en una frase?",
+          "¿Qué logro te enorgullece más y es relevante para el JD?"
+        ],
+        "badExample": "Desarrollador con experiencia buscando nuevos retos",
+        "goodExample": "Senior Full-Stack Developer con 8+ años creando aplicaciones escalables que han procesado $10M+ en transacciones. Experto en React/Node.js y arquitectura cloud, con historial de reducir costos 40% mientras aumento engagement 60%. Apasionado por mentoría técnica y metodologías ágiles.",
+        "templateSTAR": {
+          "situacion": "[Tu título] con [años] de experiencia en [industria del JD]",
+          "tarea": "Especializado en [skills clave del JD]",
+          "accion": "Historial de [logro cuantificable relevante]",
+          "resultado": "Buscando [objetivo alineado con empresa del JD]"
+        }
+      }
+    }
   },
   "improvementPath": {
-    "current": 78,
-    "potential": 91,
+    "current": 85,
+    "potential": 95,
     "steps": [
       {
-        "action": "Agrega 5 keywords técnicas faltantes críticas",
+        "action": "Agrega 5 keywords técnicas faltantes críticas del JD",
         "impact": "+5%",
-        "timeframe": "15 minutos"
-      },
-      {
-        "action": "Cuantifica logros con métricas en 3 experiencias",
-        "impact": "+4%",
-        "timeframe": "30 minutos"
-      },
-      {
-        "action": "Crea summary ejecutivo de 4 líneas",
-        "impact": "+3%",
-        "timeframe": "20 minutos"
-      },
-      {
-        "action": "Agrega certificaciones recientes",
-        "impact": "+1%",
-        "timeframe": "10 minutos"
+        "timeframe": "15 minutos",
+        "detailedExamples": {
+          "direct": "Si has usado estas tecnologías:\\n\\n• Implementé Kubernetes para orquestar 50+ microservicios, reduciendo downtime 90%\\n• Configuré pipelines CI/CD con Jenkins automatizando deployments y reduciendo errores 75%",
+          "indirect": "Si tienes experiencia relacionada:\\n\\n• Gestioné infraestructura de contenedores Docker mejorando eficiencia de deployments 60%\\n• Automaticé procesos de testing y deployment reduciendo tiempo de release de 2 días a 4 horas",
+          "noExperience": "Si no tienes experiencia directa (sé honesto pero destaca transferibles):\\n\\n• Experiencia sólida en DevOps y automatización, actualmente capacitándome en Kubernetes\\n• Familiarizado con conceptos de orquestación de contenedores y microservicios"
+        },
+        "keywords": ["Kubernetes", "CI/CD", "Terraform", "GraphQL", "Docker"]
       }
     ]
   },
   "atsDetectionGuide": {
     "indicators": [
-      "Portal con campos estandarizados para skills",
-      "Subida de archivo + formularios adicionales",
-      "Preguntas de screening automáticas",
-      "Sistema de puntaje visible al aplicar"
+      "Portal con campos estandarizados para skills y experiencia",
+      "Subida de archivo seguida de formularios adicionales",
+      "Preguntas de screening automáticas (ej: '¿Tienes 5+ años de experiencia?')",
+      "Sistema de puntaje o match visible al aplicar"
     ],
     "commonSystems": {
       "startups": ["Greenhouse", "Lever", "Workable"],
@@ -251,13 +265,13 @@ Responde SOLO con JSON válido (sin markdown). Formato EXACTO:
       "agencies": ["Bullhorn", "Jobvite"]
     },
     "detectionTips": [
-      "Busca el nombre del ATS en el footer del portal",
-      "Revisa la URL (greenhouse.io, myworkday.com, etc.)",
-      "LinkedIn Jobs suele usar su propio ATS",
-      "Indeed y otros agregadores no usan ATS propio"
+      "Busca el nombre del ATS en el footer del portal de aplicación",
+      "Revisa la URL: greenhouse.io, myworkday.com, etc.",
+      "LinkedIn Jobs usa su propio sistema interno",
+      "Indeed y otros agregadores NO usan ATS propio, redirigen a la empresa"
     ]
   },
-  "reasoning": "El CV muestra experiencia técnica sólida pero necesita optimización para ATS. Las principales áreas de mejora son: agregar keywords críticas faltantes, cuantificar logros con métricas específicas, y crear un summary ejecutivo impactante."
+  "reasoning": "El CV muestra experiencia técnica sólida con 5+ años en desarrollo. Las principales áreas de mejora son: (1) agregar keywords críticas faltantes como 'Kubernetes' y 'CI/CD' mencionadas 3+ veces en el JD, (2) cuantificar logros actuales con métricas específicas, (3) crear summary ejecutivo impactante de 3-4 líneas que capture propuesta de valor."
 }`;
 
   try {
@@ -266,7 +280,7 @@ Responde SOLO con JSON válido (sin markdown). Formato EXACTO:
       messages: [
         {
           role: "system",
-          content: "Eres el experto #1 mundial en ATS y optimización de CVs. SIEMPRE generas análisis COMPLETOS con TODOS los campos requeridos. NUNCA dejes campos vacíos o con valores 0. Proporciona datos REALES y ESPECÍFICOS basados en el CV y JD. Respondes SOLO con JSON válido sin markdown."
+          content: "Eres el experto #1 mundial en ATS (Applicant Tracking Systems - Sistemas de Seguimiento de Candidatos) y optimización de CVs. SIEMPRE generas análisis COMPLETOS con TODOS los campos requeridos, incluyendo ejemplos ESPECÍFICOS y COPIABLES para cada recomendación. NUNCA dejes campos vacíos. Proporciona datos REALES adaptados al CV y JD específicos. Respondes SOLO con JSON válido sin markdown."
         },
         {
           role: "user",
@@ -274,14 +288,14 @@ Responde SOLO con JSON válido (sin markdown). Formato EXACTO:
         }
       ],
       temperature: 0.5,
-      max_tokens: 4000,
+      max_tokens: 4096,
       top_p: 0.95
     });
 
     const responseText = completion.choices[0].message.content.trim();
     const jsonText = responseText
-      .replace(/```json\n?/g, '')
-      .replace(/```\n?/g, '')
+      .replace(/```json\\n?/g, '')
+      .replace(/```\\n?/g, '')
       .trim();
 
     let analysis;
@@ -289,12 +303,12 @@ Responde SOLO con JSON válido (sin markdown). Formato EXACTO:
       analysis = JSON.parse(jsonText);
     } catch (parseErr) {
       console.error('JSON Parse Error:', parseErr);
-      console.error('Raw response:', jsonText);
+      console.error('Raw response:', jsonText.substring(0, 500));
       throw new Error('Respuesta de AI no es JSON válido');
     }
 
-    // VALIDACIÓN: Asegurar que todos los campos existen
-    if (!analysis.keywords || !analysis.keywords.technical) {
+    // VALIDACIÓN: Asegurar estructura completa
+    if (!analysis.keywords) {
       analysis.keywords = {
         technical: { found: [], missing: [] },
         soft: { found: [], missing: [] },
@@ -310,17 +324,12 @@ Responde SOLO con JSON válido (sin markdown). Formato EXACTO:
       };
     }
 
-    if (!analysis.atsBreakdown || Object.keys(analysis.atsBreakdown).length === 0) {
-      // Crear breakdown mínimo para todos los ATS
-      const atsNames = Object.keys(analysis.scores || {});
-      analysis.atsBreakdown = {};
-      atsNames.forEach(ats => {
-        analysis.atsBreakdown[ats] = {
-          score: analysis.scores[ats],
-          strengths: ["Análisis en proceso"],
-          weaknesses: ["Requiere optimización"],
-          tips: ["Revisa formato y keywords"]
-        };
+    // Validar que atsBreakdown tenga tips con ejemplos
+    if (analysis.atsBreakdown) {
+      Object.keys(analysis.atsBreakdown).forEach(ats => {
+        if (!analysis.atsBreakdown[ats].tips || !Array.isArray(analysis.atsBreakdown[ats].tips)) {
+          analysis.atsBreakdown[ats].tips = [];
+        }
       });
     }
 
@@ -339,7 +348,7 @@ export default async function handler(req, res) {
   if (!process.env.GROQ_API_KEY) {
     return res.status(500).json({ 
       error: 'Groq API key no configurada',
-      suggestion: 'Configura GROQ_API_KEY en las variables de entorno de Vercel'
+      suggestion: 'Configura GROQ_API_KEY en Vercel'
     });
   }
 
@@ -359,9 +368,9 @@ export default async function handler(req, res) {
     let jdText = '';
 
     for (const part of parts) {
-      if (!part || part === '--\r\n' || part === '--') continue;
+      if (!part || part === '--\\r\\n' || part === '--') continue;
 
-      const [header, ...bodyParts] = part.split('\r\n\r\n');
+      const [header, ...bodyParts] = part.split('\\r\\n\\r\\n');
       if (!header) continue;
 
       const nameMatch = header.match(/name="([^"]+)"/);
@@ -371,7 +380,7 @@ export default async function handler(req, res) {
 
       if (!name) continue;
 
-      const body = bodyParts.join('\r\n\r\n').replace(/\r\n--$/, '').trim();
+      const body = bodyParts.join('\\r\\n\\r\\n').replace(/\\r\\n--$/, '').trim();
 
       if (name === 'jd') {
         jdText = body;
@@ -385,13 +394,12 @@ export default async function handler(req, res) {
             const result = await mammoth.extractRawText({ buffer: fileBuffer });
             cvText = result.value;
           } else {
-            return res.status(400).json({ error: 'Formato no soportado. Usa PDF o DOCX' });
+            return res.status(400).json({ error: 'Formato no soportado' });
           }
         } catch (fileError) {
           console.error('File processing error:', fileError);
           return res.status(400).json({ 
-            error: `Error procesando archivo: ${fileError.message}`,
-            suggestion: 'Verifica que el archivo no esté corrupto o protegido'
+            error: `Error procesando archivo: ${fileError.message}`
           });
         }
       }
@@ -399,8 +407,7 @@ export default async function handler(req, res) {
 
     if (!cvText || !jdText) {
       return res.status(400).json({ 
-        error: 'Falta CV o descripción del puesto',
-        details: { hasCv: !!cvText, hasJd: !!jdText }
+        error: 'Falta CV o Job Description'
       });
     }
 
