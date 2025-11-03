@@ -1,4 +1,4 @@
-// src/App.jsx - VERSIÓN FINAL CON PDF EXPORT Y MODALS MEJORADOS
+// src/App.jsx - VERSIÓN MEJORADA CON EXPLICACIÓN DE ATS
 import { useState, useEffect } from 'react';
 import Header from './components/Header';
 import UploadForm from './components/UploadForm';
@@ -67,7 +67,7 @@ function App() {
       setTimeout(() => setLoadingStep('🔍 Extrayendo texto...'), 1000);
       setTimeout(() => setLoadingStep('🏷️ Analizando keywords...'), 2000);
       setTimeout(() => setLoadingStep('🤖 Evaluando con IA...'), 3000);
-      setTimeout(() => setLoadingStep('📊 Calculando scores...'), 4000);
+      setTimeout(() => setLoadingStep('📊 Calculando scores ATS...'), 4000);
       setTimeout(() => setLoadingStep('✨ Generando recomendaciones...'), 5000);
 
       const res = await fetch('/api/analyze-ai', {
@@ -129,13 +129,13 @@ function App() {
     localStorage.setItem('resumescore_darkmode', newMode.toString());
   };
 
-  // NUEVO: Export a PDF
+  // Export a PDF
   const handleExportPDF = () => {
     generatePDFReport(results);
     setShowExportModal(false);
   };
 
-  // Export a TXT (legacy)
+  // Export a TXT
   const handleExportTXT = () => {
     const content = generateFullReport(results);
     const blob = new Blob([content], { type: 'text/plain; charset=utf-8' });
@@ -157,7 +157,7 @@ function App() {
         : 'bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50'
     }`}>
       
-      {/* Header */}
+      {/* Header con explicación de ATS */}
       <Header 
         darkMode={darkMode}
         toggleDarkMode={toggleDarkMode}
@@ -284,7 +284,8 @@ function App() {
                 ResumeScore
               </h4>
               <p className="text-sm mb-4">
-                Optimiza tu CV para ATS con IA. Aumenta tus posibilidades de ser contratado.
+                Optimiza tu CV para los Sistemas de Seguimiento de Candidatos (ATS) usando inteligencia artificial. 
+                Aumenta tus posibilidades de conseguir entrevistas.
               </p>
               <div className="flex items-center gap-2 text-xs">
                 <span className="px-2 py-1 bg-green-500 text-white rounded">Powered by Groq AI</span>

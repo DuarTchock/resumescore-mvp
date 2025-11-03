@@ -1,4 +1,4 @@
-// src/components/Header.jsx
+// src/components/Header.jsx - MEJORADO CON EXPLICACIÓN DE ATS
 export default function Header({ darkMode, toggleDarkMode, setShowATSGuide, setShowLegal }) {
   return (
     <header className="relative pt-8 pb-6 px-6">
@@ -44,10 +44,19 @@ export default function Header({ darkMode, toggleDarkMode, setShowATSGuide, setS
           ResumeScore
         </h1>
         
-        <p className={`text-xl md:text-2xl mb-6 ${
+        {/* 🔥 EXPLICACIÓN CLARA DE ATS - PRIMERA MENCIÓN */}
+        <p className={`text-xl md:text-2xl mb-4 ${
           darkMode ? 'text-gray-300' : 'text-slate-600'
         }`}>
-          Análisis inteligente de CV con IA • 10 ATS principales
+          Optimiza tu CV para los <span className="font-bold text-blue-600 dark:text-blue-400">Sistemas de Seguimiento de Candidatos (ATS)</span>
+        </p>
+        
+        <p className={`text-base md:text-lg mb-6 max-w-3xl mx-auto ${
+          darkMode ? 'text-gray-400' : 'text-slate-500'
+        }`}>
+          Los <strong>ATS (Applicant Tracking Systems)</strong> son sistemas automatizados que las empresas 
+          utilizan para filtrar CVs antes de que lleguen a un reclutador humano. Analizamos tu CV contra 
+          los 10 sistemas ATS más populares del mercado.
         </p>
         
         <div className="flex flex-wrap items-center justify-center gap-4 text-sm">
