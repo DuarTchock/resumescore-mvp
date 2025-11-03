@@ -1,5 +1,6 @@
 // src/components/sections/SectionScores.jsx
-import { Tooltip, getScoreGradient } from '../../utils/helpers';
+import { getScoreGradient } from '../../utils/helpers';
+import { Tooltip } from '../ui/Tooltip';
 
 export function SectionScores({ sectionScores, darkMode }) {
   if (!sectionScores || Object.keys(sectionScores).length === 0) return null;

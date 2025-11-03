@@ -1,0 +1,4 @@
+Por favor confirma:
+1. ¿Tienes una carpeta /api en la raíz del proyecto?
+2. ¿El archivo helpers.js está en /src/utils/helpers.js?
+3. ¿Dónde está ubicado el archivo extract-text.js actualmente?
