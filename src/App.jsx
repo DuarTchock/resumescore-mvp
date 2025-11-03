@@ -1,22 +1,28 @@
-import { useState, useEffect } from 'react'
+// src/App.jsx - VERSIÓN FINAL COMPLETA
+import { useState, useEffect } from 'react';
+import Header from './components/Header';
+import UploadForm from './components/UploadForm';
+import ResultsView from './components/ResultsView';
+import { ATSDetailModal, ExportModal, LegalModal, ATSGuideModal, OnboardingModal } from './components/modals/AllModals';
+import { generateFullReport } from './utils/reportGenerator';
 
 function App() {
   // Estados principales
-  const [cvFile, setCvFile] = useState(null)
-  const [jdText, setJdText] = useState('')
-  const [results, setResults] = useState(null)
-  const [loading, setLoading] = useState(false)
-  const [loadingStep, setLoadingStep] = useState('')
-  const [error, setError] = useState(null)
+  const [cvFile, setCvFile] = useState(null);
+  const [jdText, setJdText] = useState('');
+  const [results, setResults] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [loadingStep, setLoadingStep] = useState('');
+  const [error, setError] = useState(null);
   
   // Estados de UI
-  const [history, setHistory] = useState([])
-  const [selectedATS, setSelectedATS] = useState(null)
-  const [showExportModal, setShowExportModal] = useState(false)
-  const [showLegal, setShowLegal] = useState(false)
-  const [showOnboarding, setShowOnboarding] = useState(false)
-  const [showATSGuide, setShowATSGuide] = useState(false)
-  const [darkMode, setDarkMode] = useState(false)
+  const [history, setHistory] = useState([]);
+  const [selectedATS, setSelectedATS] = useState(null);
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [showLegal, setShowLegal] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [showATSGuide, setShowATSGuide] = useState(false);
+  const [darkMode, setDarkMode] = useState(false);
 
   // Inicialización
   useEffect(() => {
@@ -44,7 +50,7 @@ function App() {
 
   const handleAnalyze = async () => {
     if (!cvFile || !jdText.trim()) {
-      alert('⚠️ Por favor sube un CV y pega la descripción del puesto');
+      alert('⚠️ Por favor sube un CV y pega/sube la descripción del puesto');
       return;
     }
 
@@ -136,94 +142,6 @@ function App() {
     setShowExportModal(false);
   };
 
-  const generateFullReport = (data) => {
-    if (!data) return '';
-    
-    return `
-╔═══════════════════════════════════════════════════════════════╗
-║          REPORTE DE ANÁLISIS DE CV - RESUMESCORE            ║
-╚═══════════════════════════════════════════════════════════════╝
-
-📁 Archivo: ${data.cvName}
-📅 Fecha: ${new Date(data.timestamp).toLocaleString('es-ES')}
-🤖 Powered by: Groq AI (Llama 3.3 70B)
-
-╔═══════════════════════════════════════════════════════════════╗
-║                     📊 RESUMEN EJECUTIVO                     ║
-╚═══════════════════════════════════════════════════════════════╝
-
-🎯 Coincidencia General:     ${data.matchRate}%
-📈 Promedio ATS:              ${data.average}%
-⚡ Mejora Potencial:          +${(data.improvementPath?.potential || data.average) - (data.improvementPath?.current || data.average)}%
-
-${data.improvementPath ? `
-┌───────────────────────────────────────────────────────────────┐
-│                      RUTA DE MEJORA                          │
-└───────────────────────────────────────────────────────────────┘
-
-📍 Puntuación Actual:     ${data.improvementPath.current}%
-🎯 Puntuación Potencial:  ${data.improvementPath.potential}%
-
-PASOS RECOMENDADOS:
-${data.improvementPath.steps?.map((step, i) => `
-${i + 1}. ${step.action}
-   💪 Impacto:        ${step.impact}
-   ⏱️  Tiempo:        ${step.timeframe}
-`).join('\n')}
-` : ''}
-
-╔═══════════════════════════════════════════════════════════════╗
-║                  💪 FORTALEZAS DETECTADAS                    ║
-╚═══════════════════════════════════════════════════════════════╝
-
-${data.strengths?.map((s, i) => `✓ ${i + 1}. ${s}`).join('\n') || '• No disponible'}
-
-╔═══════════════════════════════════════════════════════════════╗
-║                    🏆 SCORES POR ATS                         ║
-╚═══════════════════════════════════════════════════════════════╝
-
-${Object.entries(data.scores).map(([ats, score]) => {
-  const emoji = score >= 85 ? '🟢' : score >= 75 ? '🟡' : score >= 60 ? '🟠' : '🔴';
-  return `${emoji} ${ats.padEnd(25)} ${score}%`;
-}).join('\n')}
-
-═══════════════════════════════════════════════════════════════
-                  FIN DEL REPORTE
-═══════════════════════════════════════════════════════════════
-
-Generado por ResumeScore © 2024
-    `.trim();
-  };
-
-  const getPriorityColor = (priority) => {
-    const colors = {
-      critical: darkMode 
-        ? 'bg-red-900 text-red-200 border-red-700' 
-        : 'bg-red-50 text-red-800 border-red-300',
-      important: darkMode 
-        ? 'bg-yellow-900 text-yellow-200 border-yellow-700' 
-        : 'bg-yellow-50 text-yellow-800 border-yellow-300',
-      normal: darkMode 
-        ? 'bg-green-900 text-green-200 border-green-700' 
-        : 'bg-green-50 text-green-800 border-green-300'
-    };
-    return colors[priority] || colors.normal;
-  };
-
-  const getPriorityIcon = (priority) => {
-    return priority === 'critical' ? '🔴' : priority === 'important' ? '🟡' : '🟢';
-  };
-
-  const Tooltip = ({ text, children }) => (
-    <div className="relative inline-block group">
-      {children}
-      <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50">
-        {text}
-        <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1 border-4 border-transparent border-t-gray-900"></div>
-      </div>
-    </div>
-  );
-
   return (
     <div className={`min-h-screen transition-all duration-500 ${
       darkMode 
@@ -231,112 +149,151 @@ Generado por ResumeScore © 2024
         : 'bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50'
     }`}>
       
-      {/* Header con todos los componentes - Por brevedad, solo estructura básica */}
-      <header className="relative pt-8 pb-6 px-6">
-        <div className="absolute top-6 right-6 z-50">
-          <button
-            onClick={toggleDarkMode}
-            className={`p-3 rounded-full transition-all duration-300 ${
-              darkMode 
-                ? 'bg-yellow-400 hover:bg-yellow-300 text-gray-900' 
-                : 'bg-indigo-600 hover:bg-indigo-700 text-white'
-            } shadow-lg hover:shadow-xl`}
-          >
-            {darkMode ? '☀️' : '🌙'}
-          </button>
-        </div>
+      {/* Header */}
+      <Header 
+        darkMode={darkMode}
+        toggleDarkMode={toggleDarkMode}
+        setShowATSGuide={setShowATSGuide}
+        setShowLegal={setShowLegal}
+      />
 
-        <div className="max-w-6xl mx-auto text-center pt-8">
-          <h1 className={`text-6xl md:text-7xl font-black mb-4 ${
-            darkMode 
-              ? 'text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-indigo-400' 
-              : 'text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600'
-          }`}>
-            ResumeScore
-          </h1>
-          
-          <p className={`text-xl md:text-2xl mb-6 ${
-            darkMode ? 'text-gray-300' : 'text-slate-600'
-          }`}>
-            Análisis inteligente de CV con IA • 10 ATS principales
-          </p>
-        </div>
-      </header>
-
+      {/* Main Content */}
       <main className="max-w-6xl mx-auto px-6 pb-20">
         {!results ? (
-          /* Upload Form - versión simplificada para evitar errores */
-          <div className={`rounded-3xl shadow-2xl border overflow-hidden mb-8 ${
-            darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-slate-200'
-          }`}>
-            <div className="p-8">
-              <div className="mb-6">
-                <label className={`block text-sm font-semibold mb-3 ${
-                  darkMode ? 'text-gray-300' : 'text-slate-700'
-                }`}>
-                  📄 Tu CV
-                </label>
-                <input
-                  type="file"
-                  accept=".docx,.pdf"
-                  onChange={(e) => setCvFile(e.target.files[0])}
-                  className="block w-full"
-                />
-              </div>
-
-              <div className="mb-6">
-                <label className={`block text-sm font-semibold mb-3 ${
-                  darkMode ? 'text-gray-300' : 'text-slate-700'
-                }`}>
-                  💼 Job Description
-                </label>
-                <textarea
-                  value={jdText}
-                  onChange={(e) => setJdText(e.target.value)}
-                  className="w-full h-48 p-4 border-2 rounded-xl"
-                  placeholder="Pega aquí la descripción del puesto..."
-                />
-              </div>
-
-              {error && (
-                <div className="mb-6 p-4 bg-red-50 border-l-4 border-red-500 rounded-lg">
-                  <p className="text-red-800 text-sm">{error}</p>
-                </div>
-              )}
-
-              <button
-                onClick={handleAnalyze}
-                disabled={loading || !cvFile || !jdText}
-                className="w-full py-5 px-6 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold rounded-2xl disabled:opacity-50"
-              >
-                {loading ? loadingStep : '🤖 Analizar con IA'}
-              </button>
-            </div>
-          </div>
+          <UploadForm
+            cvFile={cvFile}
+            setCvFile={setCvFile}
+            jdText={jdText}
+            setJdText={setJdText}
+            loading={loading}
+            loadingStep={loadingStep}
+            error={error}
+            darkMode={darkMode}
+            history={history}
+            setResults={setResults}
+            onAnalyze={handleAnalyze}
+          />
         ) : (
-          /* Results - mostrar resultados básicos */
-          <div className="space-y-6">
-            <button
-              onClick={handleReset}
-              className="px-6 py-3 bg-white border-2 border-slate-300 rounded-xl"
-            >
-              Analizar otro CV
-            </button>
-            
-            <div className="bg-white p-8 rounded-3xl shadow-xl">
-              <h2 className="text-2xl font-bold mb-4">Resultados</h2>
-              <p>Match: {results.matchRate}%</p>
-              <p>Promedio: {results.average}%</p>
-            </div>
-          </div>
+          <ResultsView
+            results={results}
+            darkMode={darkMode}
+            onReset={handleReset}
+            setShowExportModal={setShowExportModal}
+            setSelectedATS={setSelectedATS}
+          />
         )}
       </main>
 
-      <style jsx>{`
+      {/* Modals */}
+      {selectedATS && (
+        <ATSDetailModal
+          selectedATS={selectedATS}
+          atsBreakdown={results.atsBreakdown}
+          scores={results.scores}
+          darkMode={darkMode}
+          onClose={() => setSelectedATS(null)}
+        />
+      )}
+
+      {showExportModal && (
+        <ExportModal
+          darkMode={darkMode}
+          onClose={() => setShowExportModal(false)}
+          onExport={handleExportReport}
+        />
+      )}
+
+      {showLegal && (
+        <LegalModal
+          darkMode={darkMode}
+          onClose={() => setShowLegal(false)}
+        />
+      )}
+
+      {showATSGuide && (
+        <ATSGuideModal
+          results={results}
+          darkMode={darkMode}
+          onClose={() => setShowATSGuide(false)}
+        />
+      )}
+
+      {showOnboarding && (
+        <OnboardingModal
+          darkMode={darkMode}
+          onClose={() => setShowOnboarding(false)}
+        />
+      )}
+
+      {/* Footer */}
+      <footer className={`py-12 px-6 border-t ${
+        darkMode ? 'bg-gray-900 border-gray-800 text-gray-400' : 'bg-white border-slate-200 text-slate-500'
+      }`}>
+        <div className="max-w-6xl mx-auto">
+          <div className="grid md:grid-cols-3 gap-8 mb-8">
+            <div>
+              <h4 className={`font-bold mb-4 ${darkMode ? 'text-gray-200' : 'text-slate-800'}`}>
+                ResumeScore
+              </h4>
+              <p className="text-sm mb-4">
+                Optimiza tu CV para ATS con IA. Aumenta tus posibilidades de ser contratado.
+              </p>
+              <div className="flex items-center gap-2 text-xs">
+                <span className="px-2 py-1 bg-green-500 text-white rounded">Powered by Groq AI</span>
+              </div>
+            </div>
+            
+            <div>
+              <h4 className={`font-bold mb-4 ${darkMode ? 'text-gray-200' : 'text-slate-800'}`}>
+                Enlaces
+              </h4>
+              <ul className="space-y-2 text-sm">
+                <li>
+                  <button onClick={() => setShowLegal(true)} className="hover:text-blue-600 transition-colors">
+                    Privacidad y Legal
+                  </button>
+                </li>
+                <li>
+                  <button onClick={() => setShowATSGuide(true)} className="hover:text-blue-600 transition-colors">
+                    Guía de ATS
+                  </button>
+                </li>
+                <li>
+                  <button onClick={() => setShowOnboarding(true)} className="hover:text-blue-600 transition-colors">
+                    Tutorial
+                  </button>
+                </li>
+              </ul>
+            </div>
+            
+            <div>
+              <h4 className={`font-bold mb-4 ${darkMode ? 'text-gray-200' : 'text-slate-800'}`}>
+                Soporte
+              </h4>
+              <p className="text-sm mb-2">¿Necesitas ayuda?</p>
+              <a href="mailto:support@resumescore.com" className="text-sm text-blue-600 hover:underline">
+                support@resumescore.com
+              </a>
+            </div>
+          </div>
+          
+          <div className={`pt-8 border-t text-center text-sm ${
+            darkMode ? 'border-gray-800' : 'border-slate-200'
+          }`}>
+            <p>© 2024 ResumeScore. Todos los derechos reservados.</p>
+            <p className="mt-2">Hecho con ❤️ para ayudarte a conseguir el trabajo de tus sueños</p>
+          </div>
+        </div>
+      </footer>
+
+      {/* Styles */}
+      <style>{`
         @keyframes fade-in {
           from { opacity: 0; transform: translateY(20px); }
           to { opacity: 1; transform: translateY(0); }
         }
+        .animate-fade-in { animation: fade-in 0.6s ease-out; }
+        .dark { color-scheme: dark; }
       `}</style>
     </div>
   );
