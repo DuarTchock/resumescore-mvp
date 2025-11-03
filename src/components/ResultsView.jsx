@@ -4,7 +4,8 @@ import ImprovementPath from './sections/ImprovementPath';
 import Strengths from './sections/Strengths';
 import KeywordsAnalysis from './sections/KeywordsAnalysis';
 import ATSScoresGrid from './sections/ATSScoresGrid';
-import { SectionScores, Recommendations } from './sections/SectionScores_and_Recommendations';
+import { Recommendations } from './modals/AllModals';  // ← CAMBIO AQUÍ
+import SectionScores from './sections/SectionScores';
 
 export default function ResultsView({ 
   results, 
@@ -45,7 +46,11 @@ export default function ResultsView({
       <HeroStats results={results} darkMode={darkMode} />
 
       {/* Improvement Path */}
-      <ImprovementPath improvementPath={results.improvementPath} darkMode={darkMode} />
+      <ImprovementPath 
+        improvementPath={results.improvementPath}
+        keywords={results.keywords}
+        darkMode={darkMode} 
+      />
 
       {/* Strengths */}
       <Strengths strengths={results.strengths} darkMode={darkMode} />

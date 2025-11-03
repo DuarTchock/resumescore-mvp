@@ -1,6 +1,5 @@
 // src/components/sections/KeywordsAnalysis.jsx
 import { Tooltip } from '../ui/Tooltip';
-import { otraFuncion } from '../../utils/helpers';
 
 export default function KeywordsAnalysis({ keywords, darkMode }) {
   if (!keywords) return null;

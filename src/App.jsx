@@ -1,10 +1,11 @@
-// src/App.jsx - VERSIÓN FINAL COMPLETA
+// src/App.jsx - VERSIÓN FINAL CON PDF EXPORT Y MODALS MEJORADOS
 import { useState, useEffect } from 'react';
 import Header from './components/Header';
 import UploadForm from './components/UploadForm';
 import ResultsView from './components/ResultsView';
 import { ATSDetailModal, ExportModal, LegalModal, ATSGuideModal, OnboardingModal } from './components/modals/AllModals';
 import { generateFullReport } from './utils/reportGenerator';
+import { generatePDFReport } from './utils/pdfGenerator';
 
 function App() {
   // Estados principales
@@ -63,8 +64,8 @@ function App() {
     form.append('jd', jdText);
 
     try {
-      setTimeout(() => setLoadingStep('📝 Extrayendo texto...'), 1000);
-      setTimeout(() => setLoadingStep('🔍 Analizando keywords...'), 2000);
+      setTimeout(() => setLoadingStep('🔍 Extrayendo texto...'), 1000);
+      setTimeout(() => setLoadingStep('🏷️ Analizando keywords...'), 2000);
       setTimeout(() => setLoadingStep('🤖 Evaluando con IA...'), 3000);
       setTimeout(() => setLoadingStep('📊 Calculando scores...'), 4000);
       setTimeout(() => setLoadingStep('✨ Generando recomendaciones...'), 5000);
@@ -128,7 +129,14 @@ function App() {
     localStorage.setItem('resumescore_darkmode', newMode.toString());
   };
 
-  const handleExportReport = () => {
+  // NUEVO: Export a PDF
+  const handleExportPDF = () => {
+    generatePDFReport(results);
+    setShowExportModal(false);
+  };
+
+  // Export a TXT (legacy)
+  const handleExportTXT = () => {
     const content = generateFullReport(results);
     const blob = new Blob([content], { type: 'text/plain; charset=utf-8' });
     const url = URL.createObjectURL(blob);
@@ -196,11 +204,51 @@ function App() {
       )}
 
       {showExportModal && (
-        <ExportModal
-          darkMode={darkMode}
-          onClose={() => setShowExportModal(false)}
-          onExport={handleExportReport}
-        />
+        <div 
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+          onClick={() => setShowExportModal(false)}
+        >
+          <div 
+            className={`max-w-md w-full rounded-3xl shadow-2xl border p-8 ${
+              darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-slate-200'
+            }`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className={`text-2xl font-bold mb-4 ${darkMode ? 'text-gray-200' : 'text-slate-800'}`}>
+              📄 Exportar Reporte
+            </h3>
+            <p className={`mb-6 ${darkMode ? 'text-gray-400' : 'text-slate-600'}`}>
+              Elige el formato para descargar tu análisis completo
+            </p>
+            <div className="space-y-3">
+              <button
+                onClick={handleExportPDF}
+                className="w-full py-4 px-6 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold rounded-xl hover:shadow-lg transition-all flex items-center justify-center gap-2"
+              >
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                </svg>
+                Descargar PDF (Recomendado)
+              </button>
+              <button
+                onClick={handleExportTXT}
+                className={`w-full py-3 px-6 rounded-xl font-semibold transition-all ${
+                  darkMode ? 'bg-gray-700 hover:bg-gray-600 text-gray-200' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                }`}
+              >
+                Descargar TXT
+              </button>
+              <button
+                onClick={() => setShowExportModal(false)}
+                className={`w-full py-3 px-6 rounded-xl font-semibold transition-all ${
+                  darkMode ? 'bg-gray-700 hover:bg-gray-600' : 'bg-slate-100 hover:bg-slate-200'
+                }`}
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {showLegal && (
