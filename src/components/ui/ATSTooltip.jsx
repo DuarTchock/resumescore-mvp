@@ -1,6 +1,6 @@
 // src/components/ui/ATSTooltip.jsx - Tooltips especializados para términos ATS
-//import { Tooltip } from './Tooltip';
-import { ATSTooltip, InfoIconWithTooltip } from './ui/ATSTooltip';
+import { Tooltip } from './Tooltip';
+
 
 /**
  * ATSTooltip - Tooltip especializado con explicaciones de términos relacionados a ATS
