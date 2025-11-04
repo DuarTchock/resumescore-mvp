@@ -373,6 +373,18 @@ IMPORTANTE: Responde AHORA con el JSON completo. NO uses comillas dobles " dentr
     // Validar sectionScores
     if (analysis.sectionScores) {
       Object.keys(analysis.sectionScores).forEach(section => {
+        // Si es número en vez de objeto, convertir
+        if (typeof analysis.sectionScores[section] === 'number') {
+          const score = analysis.sectionScores[section];
+          analysis.sectionScores[section] = {
+            score: score,
+            socraticGuide: {
+              questions: [],
+              transformation: {},
+              templateSTAR: {}
+            }
+          };
+        }
         if (!analysis.sectionScores[section].socraticGuide) {
           analysis.sectionScores[section].socraticGuide = {
             questions: [],
