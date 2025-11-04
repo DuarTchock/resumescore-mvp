@@ -1,4 +1,4 @@
-// api/analyze-ai.js - VERSIÓN SAFE - SIN JSON PARSE ERRORS
+// api/analyze-ai.js - VERSIÓN MEJORADA CON EJEMPLOS ESPECÍFICOS Y MÉTODO SOCRÁTICO
 import PDFParser from 'pdf2json';
 import mammoth from 'mammoth';
 import Groq from 'groq-sdk';
@@ -50,7 +50,7 @@ async function extractTextFromPDF(buffer) {
             }
           });
         });
-        text = text.replace(/\s+/g, ' ').trim();
+        text = text.replace(/\\s+/g, ' ').trim();
         resolve(text);
       } catch (err) {
         console.error('Error en dataReady:', err);
@@ -65,12 +65,9 @@ async function extractTextFromPDF(buffer) {
   });
 }
 
-// === ANÁLISIS CON GROQ - PROMPT SAFE ===
+// === ANÁLISIS CON GROQ - PROMPT MEJORADO ===
 async function analyzeWithAI(cvText, jdText) {
-  const prompt = `Eres el experto #1 mundial en ATS (Applicant Tracking Systems) y optimización de CVs.
-
-**TU MISIÓN:**
-Analizar este CV contra el Job Description y generar un reporte COMPLETO y ACCIONABLE.
+  const prompt = `Eres el experto #1 mundial en Sistemas de Seguimiento de Candidatos (ATS - Applicant Tracking Systems) y optimización de CVs. Analiza este CV contra el Job Description y genera un reporte COMPLETO, DETALLADO y 100% ACCIONABLE.
 
 **JOB DESCRIPTION:**
 ${jdText.substring(0, 2500)}
@@ -78,74 +75,204 @@ ${jdText.substring(0, 2500)}
 **CURRICULUM VITAE:**
 ${cvText.substring(0, 3500)}
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-INSTRUCCIONES CRÍTICAS
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+INSTRUCCIONES CRÍTICAS:
 
-🔥 REGLA #1 - KEYWORDS FALTANTES:
-SOLO incluye en keywords.*.missing aquellas keywords que:
-- Estan EXPLICITAMENTE escritas en el Job Description
-- NO estan en el CV del candidato
-- Si el CV cubre todas las keywords del JD → deja missing = []
-- NUNCA inventes keywords que no estan en el JD
-- NUNCA incluyas keywords del CV que no estan en el JD
+1. **EJEMPLOS ESPECÍFICOS**: CADA tip, recomendación y paso DEBE incluir ejemplos CONCRETOS basados en el JD y CV específicos del candidato
+2. **MÉTODO SOCRÁTICO**: Para cada sección del CV, proporciona preguntas que guíen al candidato a descubrir sus fortalezas
+3. **TEXTO COPIABLE**: Proporciona ejemplos que el candidato pueda copiar y pegar directamente en su CV
+4. **ADAPTADO AL CANDIDATO**: Los ejemplos deben reflejar la experiencia actual mostrada en el CV
 
-🔥 REGLA #2 - RECOMENDACIONES:
-Genera AL MENOS 3-8 recommendations.
-Cada una debe tener: priority, text, section, example, impact.
-Nunca dejes recommendations vacio.
+Responde SOLO con JSON válido (sin markdown). Formato EXACTO:
 
-🔥 REGLA #3 - RUTA DE MEJORA:
-Los pasos en improvementPath.steps deben basarse SOLO en:
-- Keywords que REALMENTE faltan del JD
-- Mejoras de formato ATS
-- Cuantificacion de logros
-NUNCA menciones keywords que NO estan en el JD.
-
-🔥 REGLA #4 - EJEMPLOS COMPLETOS:
-En cada paso de improvementPath, el campo detailedExamples debe estar 100% completo.
-NUNCA uses strings vacios "".
-Todos los campos context, direct, indirect, noExperience deben tener contenido.
-
-🔥 REGLA #5 - ATS BREAKDOWN:
-Genera datos COMPLETOS para los 10 ATS: Workday, Greenhouse, iCIMS, Lever, 
-SAP SuccessFactors, BambooHR, Taleo, Jobvite, Bullhorn, Workable.
-Cada uno debe tener: score, strengths (2+), weaknesses (2+), tips (2+).
-
-🔥 REGLA #6 - JSON VALIDO:
-- USA COMILLAS SIMPLES ' dentro de strings, NUNCA dobles "
-- Para saltos de linea usa \\n
-- NO uses emojis, usa simbolos: ✓ ✗ → • - +
-- Escapa correctamente caracteres especiales
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-Responde SOLO con JSON valido, sin markdown, sin backticks.
-
-Estructura requerida:
 {
-  "matchRate": 90,
-  "scores": { 10 sistemas ATS con scores },
-  "recommendations": [ array con 3-8 objetos ],
-  "strengths": [ array de fortalezas ],
+  "matchRate": 85,
+  "scores": {
+    "Workday": 88,
+    "Greenhouse": 82,
+    "iCIMS": 80,
+    "Lever": 89,
+    "SAP SuccessFactors": 78,
+    "BambooHR": 90,
+    "Taleo": 75,
+    "Jobvite": 81,
+    "Bullhorn": 79,
+    "Workable": 86
+  },
+  "recommendations": [
+    {
+      "priority": "critical",
+      "text": "Agrega la keyword 'gestión de proyectos ágiles' que aparece 4 veces en el JD pero 0 en tu CV",
+      "impact": "high",
+      "section": "experience",
+      "example": "• Lideré 8 proyectos ágiles con equipos de 12+ personas usando Scrum, logrando entregas 25% más rápidas y reduciendo bugs en 40%"
+    }
+  ],
+  "strengths": [
+    "Experiencia sólida de 5+ años en desarrollo de software",
+    "Dominio comprobado de Python, React y Node.js",
+    "Historial de liderazgo de equipos multidisciplinarios"
+  ],
   "keywords": {
-    "technical": { "found": [], "missing": [] },
-    "soft": { "found": [], "missing": [] },
-    "industry": { "found": [], "missing": [] }
+    "technical": {
+      "found": ["Python", "React", "Node.js", "AWS", "Docker"],
+      "missing": ["Kubernetes", "CI/CD", "Terraform"]
+    },
+    "soft": {
+      "found": ["liderazgo", "comunicación"],
+      "missing": ["pensamiento crítico", "adaptabilidad"]
+    },
+    "industry": {
+      "found": ["fintech", "desarrollo ágil"],
+      "missing": ["DevOps", "microservicios"]
+    }
   },
-  "atsBreakdown": { 10 ATS con score, strengths, weaknesses, tips },
-  "sectionScores": { con socraticGuide para cada seccion },
+  "atsBreakdown": {
+    "Workday": {
+      "score": 88,
+      "strengths": ["Formato compatible con estándares ATS", "Keywords bien distribuidas"],
+      "weaknesses": ["Falta sección de certificaciones", "Algunos bullets sin métricas"],
+      "tips": [
+        {
+          "tip": "Usa bullets con formato • al inicio de cada logro",
+          "example": "BASADO EN TU JD QUE MENCIONA 'gestión de equipos':\\n\\n• Lideré equipo de 12 desarrolladores aumentando productividad 40%\\n• Gestioné presupuesto de $500K optimizando recursos 25%\\n• Mentoré 5 junior developers acelerando onboarding 50%",
+          "why": "Workday ATS prioriza formato de bullets para extracción automática"
+        },
+        {
+          "tip": "Agrega sección 'Certifications' después de Education",
+          "example": "CERTIFICATIONS\\n• AWS Solutions Architect Associate (2024)\\n• Scrum Master Certified (2023)\\n• Google Cloud Professional (2023)",
+          "why": "Workday busca específicamente esta sección"
+        }
+      ]
+    },
+    "Greenhouse": {
+      "score": 82,
+      "strengths": ["Experiencia bien estructurada"],
+      "weaknesses": ["Falta summary ejecutivo"],
+      "tips": [
+        {
+          "tip": "Agrega summary de 3-4 líneas al inicio",
+          "example": "Senior Full-Stack Developer con 8+ años optimizando aplicaciones web de alto tráfico. Experto en React, Node.js y arquitectura cloud (AWS). Historial comprobado aumentando conversión 45% y liderando equipos de 12+ personas en ambientes ágiles.",
+          "why": "Greenhouse ATS usa el summary para matching inicial"
+        }
+      ]
+    }
+  },
+  "sectionScores": {
+    "experience": {
+      "score": 82,
+      "socraticGuide": {
+        "questions": [
+          "¿Cuántas personas se beneficiaron directamente de tu trabajo?",
+          "¿Qué métrica específica mejoró gracias a tu contribución?",
+          "¿Cuánto tiempo o dinero ahorraste a la empresa?",
+          "¿Qué problema crítico resolviste y cómo?"
+        ],
+        "badExample": "Desarrollé features para el producto y trabajé con el equipo",
+        "goodExample": "Desarrollé 15 features críticas que aumentaron engagement 34% y retención de usuarios en 2.5 meses, impactando a 50K+ usuarios activos",
+        "templateSTAR": {
+          "situacion": "El proyecto necesitaba [problema específico del JD]",
+          "tarea": "Me asignaron [tu responsabilidad relacionada al JD]",
+          "accion": "Implementé [solución usando skills del JD] liderando [equipo/proceso]",
+          "resultado": "Logré [métrica cuantificable] en [timeframe], generando [impacto en negocio]"
+        },
+        "jdKeywords": ["gestión de equipos", "metodología ágil", "optimización"],
+        "yourCurrentText": "Developer en empresa tech",
+        "improvedVersion": "Senior Developer liderando equipo de 8 personas con metodología ágil, optimizando arquitectura y reduciendo tiempo de deployment 60%"
+      }
+    },
+    "education": {
+      "score": 75,
+      "socraticGuide": {
+        "questions": [
+          "¿Qué proyectos académicos son relevantes para este puesto?",
+          "¿Obtuviste algún reconocimiento o GPA notable?",
+          "¿Participaste en actividades extracurriculares relevantes?"
+        ],
+        "badExample": "Licenciatura en Ingeniería",
+        "goodExample": "Licenciatura en Ingeniería de Software (GPA 3.8/4.0) con especialización en Arquitectura Cloud. Proyecto destacado: Sistema distribuido que soportó 100K usuarios concurrentes.",
+        "templateSTAR": {
+          "situacion": "El JD requiere formación en [área específica]",
+          "tarea": "Completé [grado/certificación] enfocándome en [especialización]",
+          "accion": "Desarrollé [proyecto final/tesis] aplicando [tecnologías del JD]",
+          "resultado": "Logré [GPA/reconocimiento] y [impacto del proyecto]"
+        }
+      }
+    },
+    "skills": {
+      "score": 68,
+      "socraticGuide": {
+        "questions": [
+          "¿En qué proyectos reales has usado cada skill?",
+          "¿Cuál es tu nivel de dominio: básico, intermedio o avanzado?",
+          "¿Puedes cuantificar tu experiencia con cada tecnología?"
+        ],
+        "badExample": "Python, React, SQL",
+        "goodExample": "Python (5+ años, 10 proyectos prod) • React (3 años, apps con 50K+ usuarios) • SQL (optimización de queries, reducción de tiempo 70%)",
+        "templateSTAR": {
+          "situacion": "El JD prioriza [skill específica]",
+          "tarea": "He usado [skill] en [número] proyectos durante [tiempo]",
+          "accion": "Recientemente [proyecto específico donde usaste el skill]",
+          "resultado": "Logré [métrica] demostrando dominio avanzado"
+        }
+      }
+    },
+    "summary": {
+      "score": 60,
+      "socraticGuide": {
+        "questions": [
+          "¿Qué te hace único para ESTE puesto específico?",
+          "¿Cuál es tu propuesta de valor en una frase?",
+          "¿Qué logro te enorgullece más y es relevante para el JD?"
+        ],
+        "badExample": "Desarrollador con experiencia buscando nuevos retos",
+        "goodExample": "Senior Full-Stack Developer con 8+ años creando aplicaciones escalables que han procesado $10M+ en transacciones. Experto en React/Node.js y arquitectura cloud, con historial de reducir costos 40% mientras aumento engagement 60%. Apasionado por mentoría técnica y metodologías ágiles.",
+        "templateSTAR": {
+          "situacion": "[Tu título] con [años] de experiencia en [industria del JD]",
+          "tarea": "Especializado en [skills clave del JD]",
+          "accion": "Historial de [logro cuantificable relevante]",
+          "resultado": "Buscando [objetivo alineado con empresa del JD]"
+        }
+      }
+    }
+  },
   "improvementPath": {
-    "current": numero,
-    "potential": numero,
-    "timeToImprove": string,
-    "steps": [ array con detailedExamples completos ]
+    "current": 85,
+    "potential": 95,
+    "steps": [
+      {
+        "action": "Agrega 5 keywords técnicas faltantes críticas del JD",
+        "impact": "+5%",
+        "timeframe": "15 minutos",
+        "detailedExamples": {
+          "direct": "Si has usado estas tecnologías:\\n\\n• Implementé Kubernetes para orquestar 50+ microservicios, reduciendo downtime 90%\\n• Configuré pipelines CI/CD con Jenkins automatizando deployments y reduciendo errores 75%",
+          "indirect": "Si tienes experiencia relacionada:\\n\\n• Gestioné infraestructura de contenedores Docker mejorando eficiencia de deployments 60%\\n• Automaticé procesos de testing y deployment reduciendo tiempo de release de 2 días a 4 horas",
+          "noExperience": "Si no tienes experiencia directa (sé honesto pero destaca transferibles):\\n\\n• Experiencia sólida en DevOps y automatización, actualmente capacitándome en Kubernetes\\n• Familiarizado con conceptos de orquestación de contenedores y microservicios"
+        },
+        "keywords": ["Kubernetes", "CI/CD", "Terraform", "GraphQL", "Docker"]
+      }
+    ]
   },
-  "atsDetectionGuide": { guia de deteccion },
-  "reasoning": "explicacion del analisis"
-}
-
-IMPORTANTE: Responde AHORA con el JSON completo. NO uses comillas dobles " dentro de strings.`;
+  "atsDetectionGuide": {
+    "indicators": [
+      "Portal con campos estandarizados para skills y experiencia",
+      "Subida de archivo seguida de formularios adicionales",
+      "Preguntas de screening automáticas (ej: '¿Tienes 5+ años de experiencia?')",
+      "Sistema de puntaje o match visible al aplicar"
+    ],
+    "commonSystems": {
+      "startups": ["Greenhouse", "Lever", "Workable"],
+      "enterprises": ["Workday", "SAP SuccessFactors", "Taleo"],
+      "agencies": ["Bullhorn", "Jobvite"]
+    },
+    "detectionTips": [
+      "Busca el nombre del ATS en el footer del portal de aplicación",
+      "Revisa la URL: greenhouse.io, myworkday.com, etc.",
+      "LinkedIn Jobs usa su propio sistema interno",
+      "Indeed y otros agregadores NO usan ATS propio, redirigen a la empresa"
+    ]
+  },
+  "reasoning": "El CV muestra experiencia técnica sólida con 5+ años en desarrollo. Las principales áreas de mejora son: (1) agregar keywords críticas faltantes como 'Kubernetes' y 'CI/CD' mencionadas 3+ veces en el JD, (2) cuantificar logros actuales con métricas específicas, (3) crear summary ejecutivo impactante de 3-4 líneas que capture propuesta de valor."
+}`;
 
   try {
     const completion = await groq.chat.completions.create({
@@ -153,51 +280,34 @@ IMPORTANTE: Responde AHORA con el JSON completo. NO uses comillas dobles " dentr
       messages: [
         {
           role: "system",
-          content: "Eres experto en ATS. CRITICO: (1) keywords.*.missing SOLO del JD que NO en CV, si CV cubre todo → missing = []. (2) AL MENOS 3-8 recommendations. (3) detailedExamples 100% completos, NUNCA vacios. (4) 10 ATS completos. (5) Ruta solo con keywords del JD. (6) USA COMILLAS SIMPLES ' dentro de strings JSON, NUNCA dobles. Respondes SOLO JSON valido sin markdown."
+          content: "Eres el experto #1 mundial en ATS (Applicant Tracking Systems - Sistemas de Seguimiento de Candidatos) y optimización de CVs. SIEMPRE generas análisis COMPLETOS con TODOS los campos requeridos, incluyendo ejemplos ESPECÍFICOS y COPIABLES para cada recomendación. NUNCA dejes campos vacíos. Proporciona datos REALES adaptados al CV y JD específicos. Respondes SOLO con JSON válido sin markdown."
         },
         {
           role: "user",
           content: prompt
         }
       ],
-      temperature: 0.3,
-      max_tokens: 8000,
-      top_p: 0.9
+      temperature: 0.5,
+      max_tokens: 4096,
+      top_p: 0.95
     });
 
     const responseText = completion.choices[0].message.content.trim();
-    
-    // Limpiar markdown si viene
-    let jsonText = responseText
-      .replace(/```json\n?/g, '')
-      .replace(/```\n?/g, '')
+    const jsonText = responseText
+      .replace(/```json\\n?/g, '')
+      .replace(/```\\n?/g, '')
       .trim();
-    
-    // Intentar arreglar comillas problemáticas comunes
-    jsonText = jsonText
-      .replace(/"\s*:\s*"([^"]*)"([^"]*)"([^"]*)"(\s*[,\}])/g, '": "$1\'$2\'$3"$4')  // Comillas internas
-      .replace(/❌/g, 'X')
-      .replace(/✅/g, 'V')
-      .replace(/"/g, '"')  // Reemplazar comillas curvas
 
     let analysis;
     try {
       analysis = JSON.parse(jsonText);
     } catch (parseErr) {
       console.error('JSON Parse Error:', parseErr);
-      console.error('Raw response (first 1000 chars):', jsonText.substring(0, 1000));
-      console.error('Error position:', parseErr.message);
-      
-      // Intentar una segunda vez con más limpieza
-      try {
-        jsonText = jsonText.replace(/[\u2018\u2019]/g, "'").replace(/[\u201C\u201D]/g, '"');
-        analysis = JSON.parse(jsonText);
-      } catch (secondErr) {
-        throw new Error('Respuesta de AI no es JSON valido: ' + secondErr.message);
-      }
+      console.error('Raw response:', jsonText.substring(0, 500));
+      throw new Error('Respuesta de AI no es JSON válido');
     }
 
-    // VALIDACIONES
+    // VALIDACIÓN: Asegurar estructura completa
     if (!analysis.keywords) {
       analysis.keywords = {
         technical: { found: [], missing: [] },
@@ -206,191 +316,19 @@ IMPORTANTE: Responde AHORA con el JSON completo. NO uses comillas dobles " dentr
       };
     }
 
-    // Bug Fix #4: Asegurar 3+ recommendations
-    if (!analysis.recommendations || analysis.recommendations.length === 0) {
-      analysis.recommendations = [
-        {
-          priority: "important",
-          text: "Cuantifica tus logros agregando metricas especificas",
-          impact: "high",
-          section: "experience",
-          example: "En lugar de 'Gestione personal', usa 'Gestione equipo de 25 personas aumentando productividad 30%'"
-        },
-        {
-          priority: "important",
-          text: "Usa formato de bullets con simbolo • al inicio",
-          impact: "medium",
-          section: "format",
-          example: "• Lidere 120+ procesos\\n• Implemente sistema\\n• Administre pre-nomina"
-        },
-        {
-          priority: "optional",
-          text: "Agrega summary profesional de 2-3 lineas",
-          impact: "medium",
-          section: "summary",
-          example: "Especialista en RH con 3+ anos optimizando procesos de talento."
-        }
-      ];
-    }
-
     if (!analysis.improvementPath || !analysis.improvementPath.steps) {
       analysis.improvementPath = {
         current: analysis.matchRate || 70,
-        potential: Math.min((analysis.matchRate || 70) + 10, 98),
-        timeToImprove: "1-2 horas",
+        potential: (analysis.matchRate || 70) + 15,
         steps: []
       };
     }
 
-    // Bug Fix #6: Validar detailedExamples
-    if (analysis.improvementPath.steps) {
-      analysis.improvementPath.steps.forEach((step, index) => {
-        if (!step.detailedExamples) {
-          step.detailedExamples = {
-            context: {
-              jdMentions: "El JD menciona esta mejora como importante",
-              cvShows: "Tu CV puede mejorar en este aspecto"
-            },
-            direct: {
-              title: "Implementacion directa:",
-              bullets: [
-                "Revisa tu CV e identifica donde aplicar esta mejora",
-                "Usa ejemplos especificos de tu experiencia",
-                "Incluye metricas cuantificables cuando sea posible"
-              ]
-            },
-            indirect: {
-              title: "Implementacion adaptada:",
-              bullets: [
-                "Adapta el ejemplo a tu experiencia especifica",
-                "Manten el formato y estructura sugerida"
-              ]
-            },
-            noExperience: {
-              title: "Sin experiencia directa:",
-              bullets: [
-                "Enfocate en skills transferibles",
-                "Menciona experiencia relacionada"
-              ]
-            },
-            proTip: "Personaliza los ejemplos a tu experiencia real"
-          };
-        } else {
-          // Validar strings no vacíos
-          if (!step.detailedExamples.context) {
-            step.detailedExamples.context = {
-              jdMentions: "El JD requiere esta habilidad",
-              cvShows: "Tu CV puede destacar mas esto"
-            };
-          }
-          if (step.detailedExamples.context.jdMentions === "") {
-            step.detailedExamples.context.jdMentions = "El JD requiere esta habilidad";
-          }
-          if (step.detailedExamples.context.cvShows === "") {
-            step.detailedExamples.context.cvShows = "Tu CV puede destacar mas esto";
-          }
-
-          ['direct', 'indirect', 'noExperience'].forEach(level => {
-            // Si es string en vez de objeto, convertir
-            if (typeof step.detailedExamples[level] === 'string') {
-              step.detailedExamples[level] = {
-                title: `Opcion ${level}:`,
-                bullets: [step.detailedExamples[level]]
-              };
-            }
-            if (!step.detailedExamples[level]) {
-              step.detailedExamples[level] = {
-                title: `Opcion ${level}:`,
-                bullets: ["Ejemplo 1", "Ejemplo 2"]
-              };
-            }
-            if (!step.detailedExamples[level].bullets || step.detailedExamples[level].bullets.length === 0) {
-              step.detailedExamples[level].bullets = [
-                "Revisa tu experiencia y aplica esta mejora",
-                "Personaliza el ejemplo a tu caso especifico"
-              ];
-            }
-          });
-        }
-      });
-    }
-
-    // Bug Fix #2: Validar 10 ATS
-    const requiredATS = [
-      'Workday', 'Greenhouse', 'iCIMS', 'Lever', 'SAP SuccessFactors',
-      'BambooHR', 'Taleo', 'Jobvite', 'Bullhorn', 'Workable'
-    ];
-
-    if (!analysis.atsBreakdown) {
-      analysis.atsBreakdown = {};
-    }
-
-    requiredATS.forEach(ats => {
-      if (!analysis.atsBreakdown[ats]) {
-        const score = analysis.scores?.[ats] || 75;
-        analysis.atsBreakdown[ats] = {
-          score: score,
-          strengths: [
-            "Formato compatible con estandares ATS",
-            "Keywords relevantes presentes"
-          ],
-          weaknesses: [
-            "Podria optimizar distribucion de keywords",
-            "Algunos bullets sin metricas cuantificables"
-          ],
-          tips: [
-            {
-              tip: "Agrega metricas cuantificables en cada bullet point",
-              example: "En lugar de 'Gestione personal', usa 'Gestione equipo de 25 personas aumentando productividad 30%'",
-              why: `${ats} prioriza logros medibles para mejor matching`
-            },
-            {
-              tip: "Incluye keywords del JD en primeras lineas",
-              example: "Coloca las palabras clave importantes al inicio de cada seccion",
-              why: `${ats} da mas peso a keywords en primer tercio del documento`
-            }
-          ]
-        };
-      } else {
-        if (!analysis.atsBreakdown[ats].tips || !Array.isArray(analysis.atsBreakdown[ats].tips) || analysis.atsBreakdown[ats].tips.length === 0) {
-          analysis.atsBreakdown[ats].tips = [
-            {
-              tip: "Optimiza formato para mejor extraccion automatica",
-              example: "Usa bullets con simbolo • y estructura clara",
-              why: `${ats} extrae mejor con formato estructurado`
-            }
-          ];
-        }
-        if (!analysis.atsBreakdown[ats].strengths || analysis.atsBreakdown[ats].strengths.length === 0) {
-          analysis.atsBreakdown[ats].strengths = ["Formato compatible", "Keywords presentes"];
-        }
-        if (!analysis.atsBreakdown[ats].weaknesses || analysis.atsBreakdown[ats].weaknesses.length === 0) {
-          analysis.atsBreakdown[ats].weaknesses = ["Optimizacion de keywords", "Metricas en algunos bullets"];
-        }
-      }
-    });
-
-    // Validar sectionScores
-    if (analysis.sectionScores) {
-      Object.keys(analysis.sectionScores).forEach(section => {
-        // Si es número en vez de objeto, convertir
-        if (typeof analysis.sectionScores[section] === 'number') {
-          const score = analysis.sectionScores[section];
-          analysis.sectionScores[section] = {
-            score: score,
-            socraticGuide: {
-              questions: [],
-              transformation: {},
-              templateSTAR: {}
-            }
-          };
-        }
-        if (!analysis.sectionScores[section].socraticGuide) {
-          analysis.sectionScores[section].socraticGuide = {
-            questions: [],
-            transformation: {},
-            templateSTAR: {}
-          };
+    // Validar que atsBreakdown tenga tips con ejemplos
+    if (analysis.atsBreakdown) {
+      Object.keys(analysis.atsBreakdown).forEach(ats => {
+        if (!analysis.atsBreakdown[ats].tips || !Array.isArray(analysis.atsBreakdown[ats].tips)) {
+          analysis.atsBreakdown[ats].tips = [];
         }
       });
     }
@@ -430,9 +368,9 @@ export default async function handler(req, res) {
     let jdText = '';
 
     for (const part of parts) {
-      if (!part || part === '--\r\n' || part === '--') continue;
+      if (!part || part === '--\\r\\n' || part === '--') continue;
 
-      const [header, ...bodyParts] = part.split('\r\n\r\n');
+      const [header, ...bodyParts] = part.split('\\r\\n\\r\\n');
       if (!header) continue;
 
       const nameMatch = header.match(/name="([^"]+)"/);
@@ -442,7 +380,7 @@ export default async function handler(req, res) {
 
       if (!name) continue;
 
-      const body = bodyParts.join('\r\n\r\n').replace(/\r\n--$/, '').trim();
+      const body = bodyParts.join('\\r\\n\\r\\n').replace(/\\r\\n--$/, '').trim();
 
       if (name === 'jd') {
         jdText = body;
