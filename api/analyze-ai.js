@@ -1,4 +1,4 @@
-// api/analyze-ai.js - VERSIÓN COMPLETA CON BUSBOY + AI
+// api/analyze-ai.js - VERSIÓN MEJORADA CON EXTRACCIÓN ROBUSTA DE PDF
 import busboy from 'busboy';
 import { createRequire } from 'module';
 import Groq from 'groq-sdk';
@@ -13,57 +13,129 @@ const groq = new Groq({
   apiKey: process.env.GROQ_API_KEY
 });
 
-// === FUNCIÓN SEGURA PARA DECODIFICAR TEXTO DE PDF ===
+// === FUNCIÓN MEJORADA PARA DECODIFICAR TEXTO DE PDF ===
 function safeDecode(encoded) {
   if (!encoded) return '';
-  let decoded = encoded;
-  decoded = decoded.replace(/%u([0-9A-F]{4})/gi, (_, code) => {
+  try {
+    // Método 1: decodeURIComponent directo
+    return decodeURIComponent(encoded);
+  } catch (e1) {
     try {
-      return String.fromCharCode(parseInt(code, 16));
-    } catch {
-      return '';
+      // Método 2: Decodificar manualmente
+      let decoded = encoded;
+      
+      // Decodificar secuencias %uXXXX (Unicode)
+      decoded = decoded.replace(/%u([0-9A-F]{4})/gi, (_, code) => {
+        try {
+          return String.fromCharCode(parseInt(code, 16));
+        } catch {
+          return '';
+        }
+      });
+      
+      // Decodificar secuencias %XX (ASCII)
+      decoded = decoded.replace(/%([0-9A-F]{2})/gi, (_, code) => {
+        try {
+          return String.fromCharCode(parseInt(code, 16));
+        } catch {
+          return '';
+        }
+      });
+      
+      // Limpiar caracteres de control
+      decoded = decoded.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
+      
+      return decoded;
+    } catch (e2) {
+      // Método 3: Retornar original si todo falla
+      return encoded;
     }
-  });
-  decoded = decoded.replace(/%([0-9A-F]{2})/gi, (_, code) => {
-    try {
-      return String.fromCharCode(parseInt(code, 16));
-    } catch {
-      return '';
-    }
-  });
-  decoded = decoded.replace(/%[0-9A-F]?/gi, '');
-  return decoded.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
+  }
 }
 
-// === EXTRACCIÓN DE TEXTO DE PDF ===
+// === EXTRACCIÓN DE TEXTO DE PDF CON MÚLTIPLES MÉTODOS ===
 async function extractTextFromPDF(buffer) {
   return new Promise((resolve, reject) => {
     const pdfParser = new PDFParser();
+    
     pdfParser.on('pdfParser_dataError', errData => {
-      console.error('PDF Parser Error:', errData.parserError);
+      console.error('[PDF] Parser Error:', errData.parserError);
       reject(new Error('Error al parsear el PDF'));
     });
+    
     pdfParser.on('pdfParser_dataReady', pdfData => {
       try {
         let text = '';
-        pdfData.Pages.forEach(page => {
-          if (!page.Texts) return;
-          page.Texts.forEach(textItem => {
-            if (textItem.R && textItem.R[0] && textItem.R[0].T) {
-              text += safeDecode(textItem.R[0].T) + ' ';
+        let textFound = false;
+        
+        // Método 1: Extraer de pdfData.Pages (más común)
+        if (pdfData.Pages && Array.isArray(pdfData.Pages)) {
+          pdfData.Pages.forEach(page => {
+            if (!page.Texts) return;
+            
+            page.Texts.forEach(textItem => {
+              if (textItem.R && Array.isArray(textItem.R)) {
+                textItem.R.forEach(run => {
+                  if (run.T) {
+                    const decoded = safeDecode(run.T);
+                    if (decoded && decoded.trim()) {
+                      text += decoded + ' ';
+                      textFound = true;
+                    }
+                  }
+                });
+              }
+            });
+            
+            // Agregar salto de línea entre páginas
+            text += '\n';
+          });
+        }
+        
+        // Método 2: Extraer de formImage.Pages (algunos PDFs usan esto)
+        if (!textFound && pdfData.formImage && pdfData.formImage.Pages) {
+          pdfData.formImage.Pages.forEach(page => {
+            if (page.Texts) {
+              page.Texts.forEach(textItem => {
+                if (textItem.R) {
+                  textItem.R.forEach(run => {
+                    if (run.T) {
+                      const decoded = safeDecode(run.T);
+                      if (decoded && decoded.trim()) {
+                        text += decoded + ' ';
+                        textFound = true;
+                      }
+                    }
+                  });
+                }
+              });
             }
           });
-        });
+        }
+        
+        // Limpiar espacios múltiples y normalizar
         text = text.replace(/\s+/g, ' ').trim();
-        resolve(text);
+        
+        console.log('[PDF] Text extraction result:', text.length, 'chars');
+        console.log('[PDF] First 200 chars:', text.substring(0, 200));
+        
+        if (text.length === 0) {
+          console.warn('[PDF] No text extracted - PDF might be scanned image or encrypted');
+          reject(new Error('No se pudo extraer texto del PDF. Verifica que el PDF tiene texto seleccionable (no es imagen escaneada).'));
+        } else {
+          resolve(text);
+        }
+        
       } catch (err) {
-        console.error('Error en dataReady:', err);
+        console.error('[PDF] Error en dataReady:', err);
         reject(err);
       }
     });
+    
     try {
       pdfParser.parseBuffer(buffer);
     } catch (err) {
+      console.error('[PDF] Error al parsear buffer:', err);
       reject(new Error('Buffer inválido para PDF'));
     }
   });
@@ -145,11 +217,6 @@ Responde SOLO con JSON válido (sin markdown). Formato EXACTO:
           "tip": "Usa bullets con formato • al inicio de cada logro",
           "example": "BASADO EN TU JD QUE MENCIONA 'gestión de equipos':\\n\\n• Lideré equipo de 12 desarrolladores aumentando productividad 40%\\n• Gestioné presupuesto de $500K optimizando recursos 25%\\n• Mentoré 5 junior developers acelerando onboarding 50%",
           "why": "Workday ATS prioriza formato de bullets para extracción automática"
-        },
-        {
-          "tip": "Agrega sección 'Certifications' después de Education",
-          "example": "CERTIFICATIONS\\n• AWS Solutions Architect Associate (2024)\\n• Scrum Master Certified (2023)\\n• Google Cloud Professional (2023)",
-          "why": "Workday busca específicamente esta sección"
         }
       ]
     },
@@ -364,21 +431,35 @@ export default async function handler(req, res) {
         file.on('end', async () => {
           try {
             const buffer = Buffer.concat(chunks);
-            console.log('[DEBUG] Processing file:', info.filename, 'Size:', buffer.length);
+            console.log('[FILE] Processing:', info.filename, 'Size:', buffer.length, 'bytes');
 
             if (info.filename.toLowerCase().endsWith('.pdf')) {
-              cvText = await extractTextFromPDF(buffer);
-              console.log('[DEBUG] PDF text extracted:', cvText.length, 'chars');
+              try {
+                cvText = await extractTextFromPDF(buffer);
+                console.log('[SUCCESS] PDF processed:', cvText.length, 'chars');
+              } catch (pdfError) {
+                console.error('[ERROR] PDF extraction failed:', pdfError.message);
+                reject(pdfError);
+                return;
+              }
             } else if (info.filename.toLowerCase().endsWith('.docx') || info.filename.toLowerCase().endsWith('.doc')) {
-              const result = await mammoth.extractRawText({ buffer });
-              cvText = result.value;
-              console.log('[DEBUG] DOCX text extracted:', cvText.length, 'chars');
+              try {
+                const result = await mammoth.extractRawText({ buffer });
+                cvText = result.value;
+                console.log('[SUCCESS] DOCX processed:', cvText.length, 'chars');
+              } catch (docxError) {
+                console.error('[ERROR] DOCX extraction failed:', docxError.message);
+                reject(docxError);
+                return;
+              }
             } else {
               reject(new Error('Formato no soportado. Use .pdf o .docx'));
+              return;
             }
+            
             resolve();
           } catch (err) {
-            console.error('File processing error:', err);
+            console.error('[ERROR] File processing error:', err);
             reject(err);
           }
         });
@@ -390,7 +471,7 @@ export default async function handler(req, res) {
     bb.on('field', (name, val) => {
       if (name === 'jd') {
         jdText = val;
-        console.log('[DEBUG] JD text received:', jdText.length, 'chars');
+        console.log('[FIELD] JD received:', jdText.length, 'chars');
       }
     });
 
@@ -398,16 +479,23 @@ export default async function handler(req, res) {
       try {
         await Promise.all(processing);
 
+        console.log('[CHECK] CV length:', cvText.length, '| JD length:', jdText.length);
+
         if (!cvText || !jdText) {
           return res.status(400).json({ 
             error: 'Falta CV o Job Description',
-            details: { hasCv: !!cvText, hasJd: !!jdText }
+            details: { 
+              hasCv: !!cvText, 
+              cvLength: cvText.length,
+              hasJd: !!jdText,
+              jdLength: jdText.length
+            }
           });
         }
 
-        console.log('[DEBUG] Starting AI analysis...');
+        console.log('[AI] Starting analysis...');
         const aiAnalysis = await analyzeWithAI(cvText, jdText);
-        console.log('[DEBUG] AI analysis completed');
+        console.log('[AI] Analysis completed successfully');
 
         const average = Math.round(
           Object.values(aiAnalysis.scores).reduce((a, b) => a + b, 0) / 
@@ -431,7 +519,7 @@ export default async function handler(req, res) {
         });
 
       } catch (error) {
-        console.error('Analysis error:', error);
+        console.error('[ERROR] Analysis error:', error);
         res.status(500).json({ 
           error: 'Error del servidor',
           message: error.message 
@@ -442,7 +530,7 @@ export default async function handler(req, res) {
     req.pipe(bb);
 
   } catch (error) {
-    console.error('Handler error:', error);
+    console.error('[ERROR] Handler error:', error);
     res.status(500).json({ 
       error: 'Error del servidor',
       message: error.message 
