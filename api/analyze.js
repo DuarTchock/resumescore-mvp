@@ -330,8 +330,11 @@ export default async function handler(req, res) {
     for (const part of parts) {
       if (!part || part === '--\r\n' || part === '--') continue;
 
-      const [header, ...bodyParts] = part.split('\r\n\r\n');
-      if (!header) continue;
+      const headerEndIndex = part.indexOf('\r\n\r\n');
+      if (headerEndIndex === -1) continue;
+
+      const header = part.substring(0, headerEndIndex);
+      const body = part.substring(headerEndIndex + 4).replace(/\r\n--$/, '');
 
       const nameMatch = header.match(/name="([^"]+)"/);
       const filenameMatch = header.match(/filename="([^"]+)"/);
@@ -339,8 +342,6 @@ export default async function handler(req, res) {
       const filename = filenameMatch?.[1];
 
       if (!name) continue;
-
-      const body = bodyParts.join('\r\n\r\n').replace(/\r\n--$/, '');
 
       if (name === 'jd') {
         jdText = body.trim();
