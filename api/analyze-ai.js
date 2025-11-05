@@ -1,74 +1,54 @@
-// api/analyze-ai.js - VERSIÓN MEJORADA CON EXTRACCIÓN ROBUSTA DE PDF
+// api/analyze-ai.js - CON PDF-PARSE COMO FALLBACK
 import busboy from 'busboy';
 import { createRequire } from 'module';
 import Groq from 'groq-sdk';
+import pdfParse from 'pdf-parse';
 
 const require = createRequire(import.meta.url);
 const PDFParser = require('pdf2json');
 const mammoth = require('mammoth');
 
-export const config = { api: { bodyParser: false } };
+export const config = { 
+  api: { 
+    bodyParser: false,
+    responseLimit: false
+  },
+  maxDuration: 60
+};
 
 const groq = new Groq({
   apiKey: process.env.GROQ_API_KEY
 });
 
-// === FUNCIÓN MEJORADA PARA DECODIFICAR TEXTO DE PDF ===
-function safeDecode(encoded) {
-  if (!encoded) return '';
-  try {
-    // Método 1: decodeURIComponent directo
-    return decodeURIComponent(encoded);
-  } catch (e1) {
-    try {
-      // Método 2: Decodificar manualmente
-      let decoded = encoded;
-      
-      // Decodificar secuencias %uXXXX (Unicode)
-      decoded = decoded.replace(/%u([0-9A-F]{4})/gi, (_, code) => {
-        try {
-          return String.fromCharCode(parseInt(code, 16));
-        } catch {
-          return '';
-        }
-      });
-      
-      // Decodificar secuencias %XX (ASCII)
-      decoded = decoded.replace(/%([0-9A-F]{2})/gi, (_, code) => {
-        try {
-          return String.fromCharCode(parseInt(code, 16));
-        } catch {
-          return '';
-        }
-      });
-      
-      // Limpiar caracteres de control
-      decoded = decoded.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
-      
-      return decoded;
-    } catch (e2) {
-      // Método 3: Retornar original si todo falla
-      return encoded;
-    }
-  }
-}
-
-// === EXTRACCIÓN DE TEXTO DE PDF CON MÚLTIPLES MÉTODOS ===
-async function extractTextFromPDF(buffer) {
+// === MÉTODO 1: PDF2JSON (más rápido, pero a veces falla) ===
+async function extractTextWithPDF2JSON(buffer) {
   return new Promise((resolve, reject) => {
     const pdfParser = new PDFParser();
+    let hasResolved = false;
+    
+    const timeout = setTimeout(() => {
+      if (!hasResolved) {
+        hasResolved = true;
+        reject(new Error('Timeout'));
+      }
+    }, 8000);
     
     pdfParser.on('pdfParser_dataError', errData => {
-      console.error('[PDF] Parser Error:', errData.parserError);
-      reject(new Error('Error al parsear el PDF'));
+      clearTimeout(timeout);
+      if (!hasResolved) {
+        hasResolved = true;
+        reject(new Error(errData.parserError || 'PDF2JSON error'));
+      }
     });
     
     pdfParser.on('pdfParser_dataReady', pdfData => {
+      clearTimeout(timeout);
+      if (hasResolved) return;
+      hasResolved = true;
+      
       try {
         let text = '';
-        let textFound = false;
         
-        // Método 1: Extraer de pdfData.Pages (más común)
         if (pdfData.Pages && Array.isArray(pdfData.Pages)) {
           pdfData.Pages.forEach(page => {
             if (!page.Texts) return;
@@ -77,57 +57,28 @@ async function extractTextFromPDF(buffer) {
               if (textItem.R && Array.isArray(textItem.R)) {
                 textItem.R.forEach(run => {
                   if (run.T) {
-                    const decoded = safeDecode(run.T);
-                    if (decoded && decoded.trim()) {
-                      text += decoded + ' ';
-                      textFound = true;
+                    try {
+                      text += decodeURIComponent(run.T) + ' ';
+                    } catch (e) {
+                      text += run.T + ' ';
                     }
                   }
                 });
               }
             });
-            
-            // Agregar salto de línea entre páginas
-            text += '\n';
           });
         }
         
-        // Método 2: Extraer de formImage.Pages (algunos PDFs usan esto)
-        if (!textFound && pdfData.formImage && pdfData.formImage.Pages) {
-          pdfData.formImage.Pages.forEach(page => {
-            if (page.Texts) {
-              page.Texts.forEach(textItem => {
-                if (textItem.R) {
-                  textItem.R.forEach(run => {
-                    if (run.T) {
-                      const decoded = safeDecode(run.T);
-                      if (decoded && decoded.trim()) {
-                        text += decoded + ' ';
-                        textFound = true;
-                      }
-                    }
-                  });
-                }
-              });
-            }
-          });
-        }
-        
-        // Limpiar espacios múltiples y normalizar
         text = text.replace(/\s+/g, ' ').trim();
         
-        console.log('[PDF] Text extraction result:', text.length, 'chars');
-        console.log('[PDF] First 200 chars:', text.substring(0, 200));
-        
-        if (text.length === 0) {
-          console.warn('[PDF] No text extracted - PDF might be scanned image or encrypted');
-          reject(new Error('No se pudo extraer texto del PDF. Verifica que el PDF tiene texto seleccionable (no es imagen escaneada).'));
+        if (text.length < 50) {
+          reject(new Error('Insufficient text'));
         } else {
+          console.log('[PDF2JSON] Success:', text.length, 'chars');
           resolve(text);
         }
         
       } catch (err) {
-        console.error('[PDF] Error en dataReady:', err);
         reject(err);
       }
     });
@@ -135,13 +86,66 @@ async function extractTextFromPDF(buffer) {
     try {
       pdfParser.parseBuffer(buffer);
     } catch (err) {
-      console.error('[PDF] Error al parsear buffer:', err);
-      reject(new Error('Buffer inválido para PDF'));
+      clearTimeout(timeout);
+      hasResolved = true;
+      reject(err);
     }
   });
 }
 
-// === ANÁLISIS CON GROQ - PROMPT MEJORADO ===
+// === MÉTODO 2: PDF-PARSE (fallback, más robusto) ===
+async function extractTextWithPDFParse(buffer) {
+  try {
+    console.log('[PDF-PARSE] Attempting fallback extraction...');
+    const data = await pdfParse(buffer);
+    const text = data.text.trim();
+    
+    if (text.length < 50) {
+      throw new Error('Insufficient text extracted');
+    }
+    
+    console.log('[PDF-PARSE] Success:', text.length, 'chars');
+    console.log('[PDF-PARSE] Pages:', data.numpages);
+    return text;
+    
+  } catch (err) {
+    console.error('[PDF-PARSE] Failed:', err.message);
+    throw err;
+  }
+}
+
+// === EXTRACCIÓN HÍBRIDA: PDF2JSON → PDF-PARSE ===
+async function extractTextFromPDF(buffer, filename) {
+  console.log(`[PDF] Extracting text from "${filename}", size: ${buffer.length} bytes`);
+  
+  // Método 1: Intentar con pdf2json primero (más rápido)
+  try {
+    const text = await extractTextWithPDF2JSON(buffer);
+    console.log(`[PDF] ✓ Extracted with pdf2json: ${text.length} chars`);
+    return text;
+  } catch (pdf2jsonError) {
+    console.warn(`[PDF] pdf2json failed: ${pdf2jsonError.message}`);
+    console.log('[PDF] → Trying pdf-parse fallback...');
+    
+    // Método 2: Fallback a pdf-parse
+    try {
+      const text = await extractTextWithPDFParse(buffer);
+      console.log(`[PDF] ✓ Extracted with pdf-parse: ${text.length} chars`);
+      return text;
+    } catch (pdfParseError) {
+      console.error(`[PDF] pdf-parse also failed: ${pdfParseError.message}`);
+      
+      // Ambos métodos fallaron
+      throw new Error(
+        'No se pudo extraer texto del PDF con ningún método. ' +
+        'El PDF podría estar protegido, ser una imagen escaneada, o tener codificación especial. ' +
+        'Por favor, intenta con un archivo DOCX o regenera el PDF desde tu editor.'
+      );
+    }
+  }
+}
+
+// === ANÁLISIS CON GROQ ===
 async function analyzeWithAI(cvText, jdText) {
   const prompt = `Eres el experto #1 mundial en Sistemas de Seguimiento de Candidatos (ATS - Applicant Tracking Systems) y optimización de CVs. Analiza este CV contra el Job Description y genera un reporte COMPLETO, DETALLADO y 100% ACCIONABLE.
 
@@ -362,12 +366,12 @@ RECUERDA: En la sección "keywords.missing", SOLO incluye términos que aparecen
     try {
       analysis = JSON.parse(jsonText);
     } catch (parseErr) {
-      console.error('JSON Parse Error:', parseErr);
-      console.error('Raw response:', jsonText.substring(0, 500));
+      console.error('[AI] JSON Parse Error:', parseErr);
+      console.error('[AI] Raw response:', jsonText.substring(0, 500));
       throw new Error('Respuesta de AI no es JSON válido');
     }
 
-    // VALIDACIÓN: Asegurar estructura completa
+    // VALIDACIÓN
     if (!analysis.keywords) {
       analysis.keywords = {
         technical: { found: [], missing: [] },
@@ -384,7 +388,6 @@ RECUERDA: En la sección "keywords.missing", SOLO incluye términos que aparecen
       };
     }
 
-    // Validar que atsBreakdown tenga tips con ejemplos
     if (analysis.atsBreakdown) {
       Object.keys(analysis.atsBreakdown).forEach(ats => {
         if (!analysis.atsBreakdown[ats].tips || !Array.isArray(analysis.atsBreakdown[ats].tips)) {
@@ -396,12 +399,12 @@ RECUERDA: En la sección "keywords.missing", SOLO incluye términos que aparecen
     return analysis;
 
   } catch (error) {
-    console.error('Groq API Error:', error);
+    console.error('[AI] Groq API Error:', error);
     throw new Error('Error al analizar con AI: ' + error.message);
   }
 }
 
-// === HANDLER PRINCIPAL CON BUSBOY ===
+// === HANDLER PRINCIPAL ===
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' });
 
@@ -431,14 +434,14 @@ export default async function handler(req, res) {
         file.on('end', async () => {
           try {
             const buffer = Buffer.concat(chunks);
-            console.log('[FILE] Processing:', info.filename, 'Size:', buffer.length, 'bytes');
+            console.log(`[FILE] "${info.filename}" - ${buffer.length} bytes`);
 
             if (info.filename.toLowerCase().endsWith('.pdf')) {
               try {
-                cvText = await extractTextFromPDF(buffer);
-                console.log('[SUCCESS] PDF processed:', cvText.length, 'chars');
+                cvText = await extractTextFromPDF(buffer, info.filename);
+                console.log(`[SUCCESS] PDF processed: ${cvText.length} chars`);
               } catch (pdfError) {
-                console.error('[ERROR] PDF extraction failed:', pdfError.message);
+                console.error(`[ERROR] PDF failed:`, pdfError.message);
                 reject(pdfError);
                 return;
               }
@@ -446,9 +449,9 @@ export default async function handler(req, res) {
               try {
                 const result = await mammoth.extractRawText({ buffer });
                 cvText = result.value;
-                console.log('[SUCCESS] DOCX processed:', cvText.length, 'chars');
+                console.log(`[SUCCESS] DOCX processed: ${cvText.length} chars`);
               } catch (docxError) {
-                console.error('[ERROR] DOCX extraction failed:', docxError.message);
+                console.error(`[ERROR] DOCX failed:`, docxError.message);
                 reject(docxError);
                 return;
               }
@@ -459,7 +462,7 @@ export default async function handler(req, res) {
             
             resolve();
           } catch (err) {
-            console.error('[ERROR] File processing error:', err);
+            console.error('[ERROR] File processing:', err);
             reject(err);
           }
         });
@@ -471,15 +474,13 @@ export default async function handler(req, res) {
     bb.on('field', (name, val) => {
       if (name === 'jd') {
         jdText = val;
-        console.log('[FIELD] JD received:', jdText.length, 'chars');
+        console.log('[JD] Received:', jdText.length, 'chars');
       }
     });
 
     bb.on('finish', async () => {
       try {
         await Promise.all(processing);
-
-        console.log('[CHECK] CV length:', cvText.length, '| JD length:', jdText.length);
 
         if (!cvText || !jdText) {
           return res.status(400).json({ 
@@ -495,7 +496,7 @@ export default async function handler(req, res) {
 
         console.log('[AI] Starting analysis...');
         const aiAnalysis = await analyzeWithAI(cvText, jdText);
-        console.log('[AI] Analysis completed successfully');
+        console.log('[AI] ✓ Completed');
 
         const average = Math.round(
           Object.values(aiAnalysis.scores).reduce((a, b) => a + b, 0) / 
@@ -519,18 +520,26 @@ export default async function handler(req, res) {
         });
 
       } catch (error) {
-        console.error('[ERROR] Analysis error:', error);
+        console.error('[ERROR] Analysis:', error);
         res.status(500).json({ 
-          error: 'Error del servidor',
-          message: error.message 
+          error: 'Error al procesar',
+          message: error.message
         });
       }
+    });
+
+    bb.on('error', error => {
+      console.error('[ERROR] Busboy:', error);
+      res.status(500).json({
+        error: 'Error al procesar formulario',
+        message: error.message
+      });
     });
 
     req.pipe(bb);
 
   } catch (error) {
-    console.error('[ERROR] Handler error:', error);
+    console.error('[ERROR] Handler:', error);
     res.status(500).json({ 
       error: 'Error del servidor',
       message: error.message 
