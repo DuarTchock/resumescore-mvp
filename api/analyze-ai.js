@@ -1,7 +1,11 @@
-// api/analyze-ai.js - VERSIÓN MEJORADA CON EJEMPLOS ESPECÍFICOS Y MÉTODO SOCRÁTICO
-import PDFParser from 'pdf2json';
-import mammoth from 'mammoth';
+// api/analyze-ai.js - VERSIÓN COMPLETA CON BUSBOY + AI
+import busboy from 'busboy';
+import { createRequire } from 'module';
 import Groq from 'groq-sdk';
+
+const require = createRequire(import.meta.url);
+const PDFParser = require('pdf2json');
+const mammoth = require('mammoth');
 
 export const config = { api: { bodyParser: false } };
 
@@ -50,7 +54,7 @@ async function extractTextFromPDF(buffer) {
             }
           });
         });
-        text = text.replace(/\\s+/g, ' ').trim();
+        text = text.replace(/\s+/g, ' ').trim();
         resolve(text);
       } catch (err) {
         console.error('Error en dataReady:', err);
@@ -77,10 +81,15 @@ ${cvText.substring(0, 3500)}
 
 INSTRUCCIONES CRÍTICAS:
 
-1. **EJEMPLOS ESPECÍFICOS**: CADA tip, recomendación y paso DEBE incluir ejemplos CONCRETOS basados en el JD y CV específicos del candidato
-2. **MÉTODO SOCRÁTICO**: Para cada sección del CV, proporciona preguntas que guíen al candidato a descubrir sus fortalezas
-3. **TEXTO COPIABLE**: Proporciona ejemplos que el candidato pueda copiar y pegar directamente en su CV
-4. **ADAPTADO AL CANDIDATO**: Los ejemplos deben reflejar la experiencia actual mostrada en el CV
+1. **KEYWORDS PRECISAS**: En la sección "keywords", SOLO incluye en "missing" aquellas keywords que aparecen EXPLÍCITAMENTE en el Job Description pero NO están en el CV. NO inventes keywords ni agregues sinónimos que no estén literalmente en el JD.
+
+2. **EJEMPLOS ESPECÍFICOS**: CADA tip, recomendación y paso DEBE incluir ejemplos CONCRETOS basados en el JD y CV específicos del candidato
+
+3. **MÉTODO SOCRÁTICO**: Para cada sección del CV, proporciona preguntas que guíen al candidato a descubrir sus fortalezas
+
+4. **TEXTO COPIABLE**: Proporciona ejemplos que el candidato pueda copiar y pegar directamente en su CV
+
+5. **ADAPTADO AL CANDIDATO**: Los ejemplos deben reflejar la experiencia actual mostrada en el CV
 
 Responde SOLO con JSON válido (sin markdown). Formato EXACTO:
 
@@ -206,31 +215,13 @@ Responde SOLO con JSON válido (sin markdown). Formato EXACTO:
           "¿Cuál es tu nivel de dominio: básico, intermedio o avanzado?",
           "¿Puedes cuantificar tu experiencia con cada tecnología?"
         ],
-        "badExample": "Python, React, SQL",
-        "goodExample": "Python (5+ años, 10 proyectos prod) • React (3 años, apps con 50K+ usuarios) • SQL (optimización de queries, reducción de tiempo 70%)",
+        "badExample": "Python, React, AWS",
+        "goodExample": "Python (5+ años): 20+ proyectos backend con Django/Flask | React (4+ años): 15+ apps SPA con 100K+ usuarios | AWS (3+ años): arquitectura cloud para 5M+ requests/día",
         "templateSTAR": {
-          "situacion": "El JD prioriza [skill específica]",
-          "tarea": "He usado [skill] en [número] proyectos durante [tiempo]",
-          "accion": "Recientemente [proyecto específico donde usaste el skill]",
-          "resultado": "Logré [métrica] demostrando dominio avanzado"
-        }
-      }
-    },
-    "summary": {
-      "score": 60,
-      "socraticGuide": {
-        "questions": [
-          "¿Qué te hace único para ESTE puesto específico?",
-          "¿Cuál es tu propuesta de valor en una frase?",
-          "¿Qué logro te enorgullece más y es relevante para el JD?"
-        ],
-        "badExample": "Desarrollador con experiencia buscando nuevos retos",
-        "goodExample": "Senior Full-Stack Developer con 8+ años creando aplicaciones escalables que han procesado $10M+ en transacciones. Experto en React/Node.js y arquitectura cloud, con historial de reducir costos 40% mientras aumento engagement 60%. Apasionado por mentoría técnica y metodologías ágiles.",
-        "templateSTAR": {
-          "situacion": "[Tu título] con [años] de experiencia en [industria del JD]",
-          "tarea": "Especializado en [skills clave del JD]",
-          "accion": "Historial de [logro cuantificable relevante]",
-          "resultado": "Buscando [objetivo alineado con empresa del JD]"
+          "situacion": "El JD requiere [skill específico]",
+          "tarea": "Usé [skill] durante [tiempo] en [contexto]",
+          "accion": "Desarrollé [proyectos/sistemas] aplicando [skill específico]",
+          "resultado": "Logré [métrica de impacto] en [número] de proyectos"
         }
       }
     }
@@ -272,7 +263,9 @@ Responde SOLO con JSON válido (sin markdown). Formato EXACTO:
     ]
   },
   "reasoning": "El CV muestra experiencia técnica sólida con 5+ años en desarrollo. Las principales áreas de mejora son: (1) agregar keywords críticas faltantes como 'Kubernetes' y 'CI/CD' mencionadas 3+ veces en el JD, (2) cuantificar logros actuales con métricas específicas, (3) crear summary ejecutivo impactante de 3-4 líneas que capture propuesta de valor."
-}`;
+}
+
+RECUERDA: En la sección "keywords.missing", SOLO incluye términos que aparecen LITERALMENTE en el Job Description. No agregues sinónimos o variaciones.`;
 
   try {
     const completion = await groq.chat.completions.create({
@@ -280,7 +273,7 @@ Responde SOLO con JSON válido (sin markdown). Formato EXACTO:
       messages: [
         {
           role: "system",
-          content: "Eres el experto #1 mundial en ATS (Applicant Tracking Systems - Sistemas de Seguimiento de Candidatos) y optimización de CVs. SIEMPRE generas análisis COMPLETOS con TODOS los campos requeridos, incluyendo ejemplos ESPECÍFICOS y COPIABLES para cada recomendación. NUNCA dejes campos vacíos. Proporciona datos REALES adaptados al CV y JD específicos. Respondes SOLO con JSON válido sin markdown."
+          content: "Eres el experto #1 mundial en ATS (Applicant Tracking Systems - Sistemas de Seguimiento de Candidatos) y optimización de CVs. SIEMPRE generas análisis COMPLETOS con TODOS los campos requeridos, incluyendo ejemplos ESPECÍFICOS y COPIABLES para cada recomendación. NUNCA dejes campos vacíos. Proporciona datos REALES adaptados al CV y JD específicos. En la sección 'keywords.missing', SOLO incluyes keywords que aparecen EXPLÍCITAMENTE en el Job Description. Respondes SOLO con JSON válido sin markdown."
         },
         {
           role: "user",
@@ -294,8 +287,8 @@ Responde SOLO con JSON válido (sin markdown). Formato EXACTO:
 
     const responseText = completion.choices[0].message.content.trim();
     const jsonText = responseText
-      .replace(/```json\\n?/g, '')
-      .replace(/```\\n?/g, '')
+      .replace(/```json\n?/g, '')
+      .replace(/```\n?/g, '')
       .trim();
 
     let analysis;
@@ -341,7 +334,7 @@ Responde SOLO con JSON válido (sin markdown). Formato EXACTO:
   }
 }
 
-// === HANDLER PRINCIPAL ===
+// === HANDLER PRINCIPAL CON BUSBOY ===
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' });
 
@@ -353,86 +346,100 @@ export default async function handler(req, res) {
   }
 
   try {
-    const chunks = [];
-    for await (const chunk of req) chunks.push(chunk);
-    const buffer = Buffer.concat(chunks);
-
-    const contentType = req.headers['content-type'] || '';
-    const boundaryMatch = contentType.match(/boundary=(.+?)(?:;|$)/);
-    if (!boundaryMatch) return res.status(400).json({ error: 'No boundary found' });
-    
-    const boundary = boundaryMatch[1].trim();
-    const parts = buffer.toString('binary').split(`--${boundary}`);
-    
+    const bb = busboy({ headers: req.headers });
     let cvText = '';
     let jdText = '';
+    const processing = [];
 
-    for (const part of parts) {
-      if (!part || part === '--\\r\\n' || part === '--') continue;
+    bb.on('file', (name, file, info) => {
+      if (name !== 'cv') {
+        file.resume();
+        return;
+      }
 
-      const [header, ...bodyParts] = part.split('\\r\\n\\r\\n');
-      if (!header) continue;
+      const chunks = [];
+      file.on('data', chunk => chunks.push(chunk));
 
-      const nameMatch = header.match(/name="([^"]+)"/);
-      const filenameMatch = header.match(/filename="([^"]+)"/);
-      const name = nameMatch?.[1];
-      const filename = filenameMatch?.[1];
+      const filePromise = new Promise((resolve, reject) => {
+        file.on('end', async () => {
+          try {
+            const buffer = Buffer.concat(chunks);
+            console.log('[DEBUG] Processing file:', info.filename, 'Size:', buffer.length);
 
-      if (!name) continue;
-
-      const body = bodyParts.join('\\r\\n\\r\\n').replace(/\\r\\n--$/, '').trim();
-
-      if (name === 'jd') {
-        jdText = body;
-      } else if (name === 'cv' && filename) {
-        try {
-          const fileBuffer = Buffer.from(body, 'binary');
-
-          if (filename.endsWith('.pdf')) {
-            cvText = await extractTextFromPDF(fileBuffer);
-          } else if (filename.endsWith('.docx')) {
-            const result = await mammoth.extractRawText({ buffer: fileBuffer });
-            cvText = result.value;
-          } else {
-            return res.status(400).json({ error: 'Formato no soportado' });
+            if (info.filename.toLowerCase().endsWith('.pdf')) {
+              cvText = await extractTextFromPDF(buffer);
+              console.log('[DEBUG] PDF text extracted:', cvText.length, 'chars');
+            } else if (info.filename.toLowerCase().endsWith('.docx') || info.filename.toLowerCase().endsWith('.doc')) {
+              const result = await mammoth.extractRawText({ buffer });
+              cvText = result.value;
+              console.log('[DEBUG] DOCX text extracted:', cvText.length, 'chars');
+            } else {
+              reject(new Error('Formato no soportado. Use .pdf o .docx'));
+            }
+            resolve();
+          } catch (err) {
+            console.error('File processing error:', err);
+            reject(err);
           }
-        } catch (fileError) {
-          console.error('File processing error:', fileError);
+        });
+      });
+
+      processing.push(filePromise);
+    });
+
+    bb.on('field', (name, val) => {
+      if (name === 'jd') {
+        jdText = val;
+        console.log('[DEBUG] JD text received:', jdText.length, 'chars');
+      }
+    });
+
+    bb.on('finish', async () => {
+      try {
+        await Promise.all(processing);
+
+        if (!cvText || !jdText) {
           return res.status(400).json({ 
-            error: `Error procesando archivo: ${fileError.message}`
+            error: 'Falta CV o Job Description',
+            details: { hasCv: !!cvText, hasJd: !!jdText }
           });
         }
+
+        console.log('[DEBUG] Starting AI analysis...');
+        const aiAnalysis = await analyzeWithAI(cvText, jdText);
+        console.log('[DEBUG] AI analysis completed');
+
+        const average = Math.round(
+          Object.values(aiAnalysis.scores).reduce((a, b) => a + b, 0) / 
+          Object.keys(aiAnalysis.scores).length
+        );
+
+        res.json({
+          success: true,
+          matchRate: aiAnalysis.matchRate,
+          scores: aiAnalysis.scores,
+          average,
+          recommendations: aiAnalysis.recommendations,
+          strengths: aiAnalysis.strengths || [],
+          keywords: aiAnalysis.keywords || {},
+          atsBreakdown: aiAnalysis.atsBreakdown || {},
+          sectionScores: aiAnalysis.sectionScores || {},
+          improvementPath: aiAnalysis.improvementPath || {},
+          atsDetectionGuide: aiAnalysis.atsDetectionGuide || {},
+          reasoning: aiAnalysis.reasoning,
+          poweredBy: 'Groq Llama 3.3 70B'
+        });
+
+      } catch (error) {
+        console.error('Analysis error:', error);
+        res.status(500).json({ 
+          error: 'Error del servidor',
+          message: error.message 
+        });
       }
-    }
-
-    if (!cvText || !jdText) {
-      return res.status(400).json({ 
-        error: 'Falta CV o Job Description'
-      });
-    }
-
-    const aiAnalysis = await analyzeWithAI(cvText, jdText);
-    
-    const average = Math.round(
-      Object.values(aiAnalysis.scores).reduce((a, b) => a + b, 0) / 
-      Object.keys(aiAnalysis.scores).length
-    );
-
-    res.json({
-      success: true,
-      matchRate: aiAnalysis.matchRate,
-      scores: aiAnalysis.scores,
-      average,
-      recommendations: aiAnalysis.recommendations,
-      strengths: aiAnalysis.strengths || [],
-      keywords: aiAnalysis.keywords || {},
-      atsBreakdown: aiAnalysis.atsBreakdown || {},
-      sectionScores: aiAnalysis.sectionScores || {},
-      improvementPath: aiAnalysis.improvementPath || {},
-      atsDetectionGuide: aiAnalysis.atsDetectionGuide || {},
-      reasoning: aiAnalysis.reasoning,
-      poweredBy: 'Groq Llama 3.3 70B'
     });
+
+    req.pipe(bb);
 
   } catch (error) {
     console.error('Handler error:', error);
