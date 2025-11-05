@@ -219,6 +219,70 @@ function calculateATSScores(cvText, jdText, matchData) {
   return scores;
 }
 
+function generateATSBreakdown(scores, cvStructure, matchData) {
+  const breakdown = {};
+
+  Object.entries(scores).forEach(([atsName, score]) => {
+    const characteristics = ATS_CHARACTERISTICS[atsName];
+    
+    const strengths = [];
+    if (cvStructure.hasDates && characteristics.prefersDates) strengths.push('Incluye fechas en formato estándar');
+    if (cvStructure.hasBullets) strengths.push('Usa viñetas para mejor legibilidad');
+    if (cvStructure.hasHeaders) strengths.push('Secciones claramente identificadas');
+    if (cvStructure.hasMetrics) strengths.push('Incluye métricas cuantificables');
+    if (matchData.matchRate >= 70) strengths.push(`Buena coincidencia de keywords (${matchData.matchRate}%)`);
+    if (strengths.length === 0) strengths.push('CV procesable por el sistema');
+
+    const weaknesses = [];
+    if (!cvStructure.hasDates && characteristics.prefersDates) weaknesses.push('Falta formato de fechas consistente (MM/YYYY)');
+    if (!cvStructure.hasBullets) weaknesses.push('No utiliza viñetas para listar logros');
+    if (!cvStructure.hasMetrics) weaknesses.push('Faltan métricas y resultados cuantificables');
+    if (cvStructure.hasComplexFormatting && characteristics.prefersSimpleFormat) weaknesses.push('Formato complejo (tablas/columnas) dificulta parsing');
+    if (matchData.matchRate < 70) weaknesses.push(`Bajo matching de keywords (${matchData.matchRate}%)`);
+    if (weaknesses.length === 0) weaknesses.push('Considerar agregar más keywords del Job Description');
+
+    const tips = [];
+    
+    if (characteristics.weightsKeywords >= 0.5) {
+      tips.push({
+        tip: `${atsName} prioriza keywords - usa términos exactos del JD`,
+        example: matchData.missingWords.length > 0 ? `Agregar: ${matchData.missingWords.slice(0, 3).join(', ')}` : 'Usa terminología específica de la industria',
+        why: 'Este ATS asigna 50%+ del score a coincidencia de palabras clave'
+      });
+    }
+    
+    if (characteristics.prefersDates) {
+      tips.push({
+        tip: 'Usa formato de fechas consistente',
+        example: 'Enero 2020 - Presente (o 01/2020 - Presente)',
+        why: `${atsName} extrae automáticamente tu historial laboral usando fechas`
+      });
+    }
+    
+    if (characteristics.prefersSimpleFormat) {
+      tips.push({
+        tip: 'Evita tablas, columnas múltiples y gráficos',
+        example: 'Usa formato lineal simple con secciones claras',
+        why: 'Formatos complejos confunden el parser del ATS'
+      });
+    } else {
+      tips.push({
+        tip: 'Este ATS maneja formatos más complejos',
+        example: 'Puedes usar tablas simples para skills o certificaciones',
+        why: `${atsName} tiene parser avanzado que puede procesar layouts más elaborados`
+      });
+    }
+
+    breakdown[atsName] = {
+      tips: tips.slice(0, 3),
+      strengths: strengths.slice(0, 4),
+      weaknesses: weaknesses.slice(0, 4)
+    };
+  });
+
+  return breakdown;
+}
+
 async function extractTextFromPDF(buffer) {
   return new Promise((resolve, reject) => {
     const pdfParser = new PDFParser();
@@ -311,6 +375,7 @@ export default async function handler(req, res) {
     const matchData = calculateEnhancedMatchRate(cvText, jdText);
     const scores = calculateATSScores(cvText, jdText, matchData);
     const cvStructure = analyzeStructure(cvText);
+    const atsBreakdown = generateATSBreakdown(scores, cvStructure, matchData);
 
     // Generar recomendaciones inteligentes
     const tips = [];
@@ -343,6 +408,7 @@ export default async function handler(req, res) {
       scores,
       average,
       recommendations: tips.slice(0, 4),
+      atsBreakdown,
       analysis: {
         totalKeywords: matchData.totalKeywords,
         matchedKeywords: matchData.matchedKeywords,
