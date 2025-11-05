@@ -1,8 +1,8 @@
-// api/analyze-ai.js - CON PDF-PARSE COMO FALLBACK
+// api/analyze-ai.js - VERSIÓN TEMPORAL SIN PDF-PARSE
+// (Usa esta mientras instalas pdf-parse)
 import busboy from 'busboy';
 import { createRequire } from 'module';
 import Groq from 'groq-sdk';
-import pdfParse from 'pdf-parse';
 
 const require = createRequire(import.meta.url);
 const PDFParser = require('pdf2json');
@@ -20,8 +20,8 @@ const groq = new Groq({
   apiKey: process.env.GROQ_API_KEY
 });
 
-// === MÉTODO 1: PDF2JSON (más rápido, pero a veces falla) ===
-async function extractTextWithPDF2JSON(buffer) {
+// === EXTRACCIÓN DE PDF CON PDF2JSON ===
+async function extractTextFromPDF(buffer, filename) {
   return new Promise((resolve, reject) => {
     const pdfParser = new PDFParser();
     let hasResolved = false;
@@ -29,15 +29,16 @@ async function extractTextWithPDF2JSON(buffer) {
     const timeout = setTimeout(() => {
       if (!hasResolved) {
         hasResolved = true;
-        reject(new Error('Timeout'));
+        reject(new Error('PDF processing timeout (10s). Intenta con un archivo DOCX.'));
       }
-    }, 8000);
+    }, 10000);
     
     pdfParser.on('pdfParser_dataError', errData => {
       clearTimeout(timeout);
       if (!hasResolved) {
         hasResolved = true;
-        reject(new Error(errData.parserError || 'PDF2JSON error'));
+        console.error('[PDF] Parser Error:', errData.parserError);
+        reject(new Error('Error al parsear el PDF. Intenta con un archivo DOCX.'));
       }
     });
     
@@ -50,6 +51,8 @@ async function extractTextWithPDF2JSON(buffer) {
         let text = '';
         
         if (pdfData.Pages && Array.isArray(pdfData.Pages)) {
+          console.log(`[PDF] Processing ${pdfData.Pages.length} pages`);
+          
           pdfData.Pages.forEach(page => {
             if (!page.Texts) return;
             
@@ -71,78 +74,36 @@ async function extractTextWithPDF2JSON(buffer) {
         
         text = text.replace(/\s+/g, ' ').trim();
         
+        console.log(`[PDF] Extracted: ${text.length} chars`);
+        
         if (text.length < 50) {
-          reject(new Error('Insufficient text'));
+          console.warn('[PDF] Very little text extracted');
+          reject(new Error(
+            'No se pudo extraer suficiente texto del PDF. ' +
+            'El PDF podría ser una imagen escaneada o tener codificación especial. ' +
+            'Por favor, intenta con un archivo DOCX.'
+          ));
         } else {
-          console.log('[PDF2JSON] Success:', text.length, 'chars');
+          console.log('[PDF] First 200 chars:', text.substring(0, 200));
           resolve(text);
         }
         
       } catch (err) {
-        reject(err);
+        console.error('[PDF] Error:', err);
+        reject(new Error(`Error procesando PDF: ${err.message}`));
       }
     });
     
     try {
+      console.log(`[PDF] Starting parse: "${filename}", ${buffer.length} bytes`);
       pdfParser.parseBuffer(buffer);
     } catch (err) {
       clearTimeout(timeout);
       hasResolved = true;
-      reject(err);
+      console.error('[PDF] Buffer error:', err);
+      reject(new Error('Buffer inválido para PDF'));
     }
   });
-}
-
-// === MÉTODO 2: PDF-PARSE (fallback, más robusto) ===
-async function extractTextWithPDFParse(buffer) {
-  try {
-    console.log('[PDF-PARSE] Attempting fallback extraction...');
-    const data = await pdfParse(buffer);
-    const text = data.text.trim();
-    
-    if (text.length < 50) {
-      throw new Error('Insufficient text extracted');
-    }
-    
-    console.log('[PDF-PARSE] Success:', text.length, 'chars');
-    console.log('[PDF-PARSE] Pages:', data.numpages);
-    return text;
-    
-  } catch (err) {
-    console.error('[PDF-PARSE] Failed:', err.message);
-    throw err;
-  }
-}
-
-// === EXTRACCIÓN HÍBRIDA: PDF2JSON → PDF-PARSE ===
-async function extractTextFromPDF(buffer, filename) {
-  console.log(`[PDF] Extracting text from "${filename}", size: ${buffer.length} bytes`);
-  
-  // Método 1: Intentar con pdf2json primero (más rápido)
-  try {
-    const text = await extractTextWithPDF2JSON(buffer);
-    console.log(`[PDF] ✓ Extracted with pdf2json: ${text.length} chars`);
-    return text;
-  } catch (pdf2jsonError) {
-    console.warn(`[PDF] pdf2json failed: ${pdf2jsonError.message}`);
-    console.log('[PDF] → Trying pdf-parse fallback...');
-    
-    // Método 2: Fallback a pdf-parse
-    try {
-      const text = await extractTextWithPDFParse(buffer);
-      console.log(`[PDF] ✓ Extracted with pdf-parse: ${text.length} chars`);
-      return text;
-    } catch (pdfParseError) {
-      console.error(`[PDF] pdf-parse also failed: ${pdfParseError.message}`);
-      
-      // Ambos métodos fallaron
-      throw new Error(
-        'No se pudo extraer texto del PDF con ningún método. ' +
-        'El PDF podría estar protegido, ser una imagen escaneada, o tener codificación especial. ' +
-        'Por favor, intenta con un archivo DOCX o regenera el PDF desde tu editor.'
-      );
-    }
-  }
 }
 
 // === ANÁLISIS CON GROQ ===
@@ -439,9 +400,9 @@ export default async function handler(req, res) {
             if (info.filename.toLowerCase().endsWith('.pdf')) {
               try {
                 cvText = await extractTextFromPDF(buffer, info.filename);
-                console.log(`[SUCCESS] PDF processed: ${cvText.length} chars`);
+                console.log(`[SUCCESS] PDF: ${cvText.length} chars`);
               } catch (pdfError) {
-                console.error(`[ERROR] PDF failed:`, pdfError.message);
+                console.error(`[ERROR] PDF:`, pdfError.message);
                 reject(pdfError);
                 return;
               }
@@ -449,9 +410,9 @@ export default async function handler(req, res) {
               try {
                 const result = await mammoth.extractRawText({ buffer });
                 cvText = result.value;
-                console.log(`[SUCCESS] DOCX processed: ${cvText.length} chars`);
+                console.log(`[SUCCESS] DOCX: ${cvText.length} chars`);
               } catch (docxError) {
-                console.error(`[ERROR] DOCX failed:`, docxError.message);
+                console.error(`[ERROR] DOCX:`, docxError.message);
                 reject(docxError);
                 return;
               }
@@ -462,7 +423,7 @@ export default async function handler(req, res) {
             
             resolve();
           } catch (err) {
-            console.error('[ERROR] File processing:', err);
+            console.error('[ERROR] File:', err);
             reject(err);
           }
         });
@@ -474,7 +435,7 @@ export default async function handler(req, res) {
     bb.on('field', (name, val) => {
       if (name === 'jd') {
         jdText = val;
-        console.log('[JD] Received:', jdText.length, 'chars');
+        console.log('[JD]:', jdText.length, 'chars');
       }
     });
 
@@ -485,18 +446,13 @@ export default async function handler(req, res) {
         if (!cvText || !jdText) {
           return res.status(400).json({ 
             error: 'Falta CV o Job Description',
-            details: { 
-              hasCv: !!cvText, 
-              cvLength: cvText.length,
-              hasJd: !!jdText,
-              jdLength: jdText.length
-            }
+            details: { hasCv: !!cvText, hasJd: !!jdText }
           });
         }
 
-        console.log('[AI] Starting analysis...');
+        console.log('[AI] Starting...');
         const aiAnalysis = await analyzeWithAI(cvText, jdText);
-        console.log('[AI] ✓ Completed');
+        console.log('[AI] ✓ Done');
 
         const average = Math.round(
           Object.values(aiAnalysis.scores).reduce((a, b) => a + b, 0) / 
@@ -542,7 +498,7 @@ export default async function handler(req, res) {
     console.error('[ERROR] Handler:', error);
     res.status(500).json({ 
       error: 'Error del servidor',
-      message: error.message 
+      message: error.message
     });
   }
 }
