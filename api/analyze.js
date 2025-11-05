@@ -324,10 +324,14 @@ export default async function handler(req, res) {
     const boundary = boundaryMatch[1].trim();
     const parts = buffer.toString('binary').split(`--${boundary}`);
     
+    console.log('[DEBUG] Boundary:', boundary);
+    console.log('[DEBUG] Parts found:', parts.length);
+    
     let cvText = '';
     let jdText = '';
 
-    for (const part of parts) {
+    for (let i = 0; i < parts.length; i++) {
+      const part = parts[i];
       if (!part || part === '--\r\n' || part === '--') continue;
 
       const headerEndIndex = part.indexOf('\r\n\r\n');
@@ -336,24 +340,34 @@ export default async function handler(req, res) {
       const header = part.substring(0, headerEndIndex);
       const body = part.substring(headerEndIndex + 4).replace(/\r\n--$/, '');
 
+      console.log(`[DEBUG] Part ${i} - header length:`, header.length);
+      console.log(`[DEBUG] Part ${i} - body length:`, body.length);
+      console.log(`[DEBUG] Part ${i} - header preview:`, header.substring(0, 200));
+
       const nameMatch = header.match(/name="([^"]+)"/);
       const filenameMatch = header.match(/filename="([^"]+)"/);
       const name = nameMatch?.[1];
       const filename = filenameMatch?.[1];
 
+      console.log(`[DEBUG] Part ${i} - name:`, name, 'filename:', filename);
+
       if (!name) continue;
 
       if (name === 'jd') {
         jdText = body.trim();
+        console.log('[DEBUG] JD text length:', jdText.length);
       } else if (name === 'cv' && filename) {
         try {
+          const fileBuffer = Buffer.from(body, 'binary');
+          console.log('[DEBUG] File buffer size:', fileBuffer.length);
+          
           if (filename.endsWith('.pdf')) {
-            const pdfBuffer = Buffer.from(body, 'binary');
-            cvText = await extractTextFromPDF(pdfBuffer);
+            cvText = await extractTextFromPDF(fileBuffer);
+            console.log('[DEBUG] PDF text extracted, length:', cvText.length);
           } else if (filename.endsWith('.docx')) {
-            const docxBuffer = Buffer.from(body, 'binary');
-            const result = await mammoth.extractRawText({ buffer: docxBuffer });
+            const result = await mammoth.extractRawText({ buffer: fileBuffer });
             cvText = result.value;
+            console.log('[DEBUG] DOCX text extracted, length:', cvText.length);
           }
         } catch (fileError) {
           console.error('File processing error:', fileError);
