@@ -1,322 +1,353 @@
-// api/analyze.js - Versión mejorada con análisis semántico
-import { createRequire } from 'module';
-const require = createRequire(import.meta.url);
-const PDFParser = require('pdf2json');
-const mammoth = require('mammoth');
+// api/analyze-ai.js - VERSIÓN CORREGIDA CON PARSING CORRECTO
+import PDFParser from 'pdf2json';
+import mammoth from 'mammoth';
+import Groq from 'groq-sdk';
 
 export const config = { api: { bodyParser: false } };
 
-// Sinónimos y variaciones comunes para mejorar matching
-const SYNONYMS = {
-  'manager': ['gerente', 'director', 'jefe', 'lider', 'manager'],
-  'leader': ['lider', 'gerente', 'director', 'manager'],
-  'agile': ['scrum', 'kanban', 'sprint', 'agile'],
-  'data': ['datos', 'analytics', 'business intelligence', 'bi'],
-  'analytics': ['analisis', 'data', 'metricas', 'kpi'],
-  'team': ['equipo', 'grupo', 'staff'],
-  'experience': ['experiencia', 'años', 'years'],
-  'software': ['programa', 'aplicacion', 'sistema'],
-  'develop': ['desarrollar', 'crear', 'construir', 'implementar'],
-  'manage': ['gestionar', 'administrar', 'dirigir', 'coordinar'],
-  'budget': ['presupuesto', 'financiero', 'costos'],
-  'revenue': ['ingresos', 'ventas', 'revenue'],
-  'customer': ['cliente', 'usuario', 'consumidor'],
-  'project': ['proyecto', 'iniciativa', 'programa'],
-  'strategy': ['estrategia', 'plan', 'roadmap'],
-  'operations': ['operaciones', 'procesos', 'procedimientos']
-};
+const groq = new Groq({
+  apiKey: process.env.GROQ_API_KEY
+});
 
-// Skills técnicos comunes para ponderación
-const TECH_SKILLS = [
-  'python', 'java', 'javascript', 'react', 'node', 'sql', 'aws', 'azure',
-  'docker', 'kubernetes', 'git', 'api', 'rest', 'graphql', 'mongodb',
-  'postgresql', 'redis', 'kafka', 'jenkins', 'ci/cd', 'agile', 'scrum',
-  'jira', 'confluence', 'salesforce', 'tableau', 'powerbi', 'excel',
-  'sap', 'oracle', 'workday', 'greenhouse', 'icims'
-];
-
-// Características conocidas de cada ATS
-const ATS_CHARACTERISTICS = {
-  'Workday': {
-    prefersDates: true,
-    prefersSimpleFormat: true,
-    weightsKeywords: 0.4,
-    weightsStructure: 0.3,
-    weightsExperience: 0.3
-  },
-  'Greenhouse': {
-    prefersDates: true,
-    prefersSimpleFormat: true,
-    weightsKeywords: 0.5,
-    weightsStructure: 0.25,
-    weightsExperience: 0.25
-  },
-  'iCIMS': {
-    prefersDates: false,
-    prefersSimpleFormat: false,
-    weightsKeywords: 0.6,
-    weightsStructure: 0.2,
-    weightsExperience: 0.2
-  },
-  'Lever': {
-    prefersDates: true,
-    prefersSimpleFormat: true,
-    weightsKeywords: 0.45,
-    weightsStructure: 0.3,
-    weightsExperience: 0.25
-  },
-  'SAP SuccessFactors': {
-    prefersDates: true,
-    prefersSimpleFormat: false,
-    weightsKeywords: 0.35,
-    weightsStructure: 0.35,
-    weightsExperience: 0.3
-  },
-  'BambooHR': {
-    prefersDates: true,
-    prefersSimpleFormat: true,
-    weightsKeywords: 0.5,
-    weightsStructure: 0.25,
-    weightsExperience: 0.25
-  },
-  'Taleo': {
-    prefersDates: false,
-    prefersSimpleFormat: true,
-    weightsKeywords: 0.7,
-    weightsStructure: 0.15,
-    weightsExperience: 0.15
-  },
-  'Jobvite': {
-    prefersDates: true,
-    prefersSimpleFormat: true,
-    weightsKeywords: 0.45,
-    weightsStructure: 0.3,
-    weightsExperience: 0.25
-  },
-  'Bullhorn': {
-    prefersDates: true,
-    prefersSimpleFormat: false,
-    weightsKeywords: 0.5,
-    weightsStructure: 0.25,
-    weightsExperience: 0.25
-  },
-  'Workable': {
-    prefersDates: true,
-    prefersSimpleFormat: true,
-    weightsKeywords: 0.5,
-    weightsStructure: 0.25,
-    weightsExperience: 0.25
-  }
-};
-
-function expandWithSynonyms(word) {
-  const normalized = word.toLowerCase();
-  for (const [key, synonyms] of Object.entries(SYNONYMS)) {
-    if (synonyms.includes(normalized)) {
-      return synonyms;
-    }
-  }
-  return [normalized];
-}
-
-function analyzeStructure(text) {
-  const analysis = {
-    hasDates: /\b(20\d{2}|19\d{2})\b/.test(text) || /\b\d{1,2}\/\d{4}\b/.test(text),
-    hasBullets: /[•\-\*]/.test(text) || /^\s*[\-\*•]/m.test(text),
-    hasHeaders: /\b(experience|education|skills|experiencia|educacion|habilidades)\b/i.test(text),
-    hasMetrics: /\d+%|\$\d+|increased|decreased|improved|reduced/i.test(text),
-    wordCount: text.split(/\s+/).length,
-    hasComplexFormatting: /\t|\|/.test(text)
-  };
-  
-  return analysis;
-}
-
-function calculateEnhancedMatchRate(cvText, jdText) {
-  const clean = (s) => s.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ');
-  const cv = clean(cvText);
-  const jd = clean(jdText);
-
-  // Extraer palabras significativas (4+ caracteres)
-  const jdWords = jd.match(/\b\w{4,}\b/g) || [];
-  const cvWords = cv.match(/\b\w{4,}\b/g) || [];
-
-  // Remover duplicados y crear sets
-  const uniqueJdWords = [...new Set(jdWords)];
-  const cvWordSet = new Set(cvWords);
-
-  let matchedCount = 0;
-  let techSkillsMatched = 0;
-  let techSkillsTotal = 0;
-  const missingWords = [];
-
-  // Análisis con sinónimos y ponderación
-  uniqueJdWords.forEach(jdWord => {
-    const synonyms = expandWithSynonyms(jdWord);
-    const isTechSkill = TECH_SKILLS.includes(jdWord);
-    
-    if (isTechSkill) techSkillsTotal++;
-
-    // Verificar si algún sinónimo está en el CV
-    const hasMatch = synonyms.some(syn => cvWordSet.has(syn));
-    
-    if (hasMatch) {
-      matchedCount++;
-      if (isTechSkill) techSkillsMatched++;
-    } else {
-      missingWords.push(jdWord);
+// === FUNCIÓN SEGURA PARA DECODIFICAR TEXTO DE PDF ===
+function safeDecode(encoded) {
+  if (!encoded) return '';
+  let decoded = encoded;
+  decoded = decoded.replace(/%u([0-9A-F]{4})/gi, (_, code) => {
+    try {
+      return String.fromCharCode(parseInt(code, 16));
+    } catch {
+      return '';
     }
   });
-
-  const basicMatchRate = uniqueJdWords.length > 0 
-    ? (matchedCount / uniqueJdWords.length) * 100 
-    : 0;
-
-  const techSkillRate = techSkillsTotal > 0 
-    ? (techSkillsMatched / techSkillsTotal) * 100 
-    : 100;
-
-  // Match rate ponderado (70% general, 30% tech skills)
-  const weightedMatchRate = (basicMatchRate * 0.7) + (techSkillRate * 0.3);
-
-  return {
-    matchRate: Math.round(weightedMatchRate),
-    basicMatchRate: Math.round(basicMatchRate),
-    techSkillRate: Math.round(techSkillRate),
-    missingWords: missingWords.slice(0, 5),
-    totalKeywords: uniqueJdWords.length,
-    matchedKeywords: matchedCount
-  };
-}
-
-function calculateATSScores(cvText, jdText, matchData) {
-  const cvStructure = analyzeStructure(cvText);
-  const scores = {};
-
-  Object.entries(ATS_CHARACTERISTICS).forEach(([atsName, characteristics]) => {
-    let score = 0;
-
-    // Component 1: Keyword matching (weighted by ATS preference)
-    score += matchData.matchRate * characteristics.weightsKeywords;
-
-    // Component 2: Structure score (0-100)
-    let structureScore = 0;
-    if (cvStructure.hasDates && characteristics.prefersDates) structureScore += 25;
-    if (cvStructure.hasBullets) structureScore += 25;
-    if (cvStructure.hasHeaders) structureScore += 25;
-    if (!cvStructure.hasComplexFormatting && characteristics.prefersSimpleFormat) structureScore += 25;
-    score += structureScore * characteristics.weightsStructure;
-
-    // Component 3: Experience indicators (0-100)
-    let experienceScore = 0;
-    if (cvStructure.hasDates) experienceScore += 50;
-    if (cvStructure.hasMetrics) experienceScore += 50;
-    score += experienceScore * characteristics.weightsExperience;
-
-    scores[atsName] = Math.min(100, Math.max(0, Math.round(score)));
+  decoded = decoded.replace(/%([0-9A-F]{2})/gi, (_, code) => {
+    try {
+      return String.fromCharCode(parseInt(code, 16));
+    } catch {
+      return '';
+    }
   });
-
-  return scores;
+  decoded = decoded.replace(/%[0-9A-F]?/gi, '');
+  return decoded.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
 }
 
-function generateATSBreakdown(scores, cvStructure, matchData) {
-  const breakdown = {};
-
-  Object.entries(scores).forEach(([atsName, score]) => {
-    const characteristics = ATS_CHARACTERISTICS[atsName];
-    
-    const strengths = [];
-    if (cvStructure.hasDates && characteristics.prefersDates) strengths.push('Incluye fechas en formato estándar');
-    if (cvStructure.hasBullets) strengths.push('Usa viñetas para mejor legibilidad');
-    if (cvStructure.hasHeaders) strengths.push('Secciones claramente identificadas');
-    if (cvStructure.hasMetrics) strengths.push('Incluye métricas cuantificables');
-    if (matchData.matchRate >= 70) strengths.push(`Buena coincidencia de keywords (${matchData.matchRate}%)`);
-    if (strengths.length === 0) strengths.push('CV procesable por el sistema');
-
-    const weaknesses = [];
-    if (!cvStructure.hasDates && characteristics.prefersDates) weaknesses.push('Falta formato de fechas consistente (MM/YYYY)');
-    if (!cvStructure.hasBullets) weaknesses.push('No utiliza viñetas para listar logros');
-    if (!cvStructure.hasMetrics) weaknesses.push('Faltan métricas y resultados cuantificables');
-    if (cvStructure.hasComplexFormatting && characteristics.prefersSimpleFormat) weaknesses.push('Formato complejo (tablas/columnas) dificulta parsing');
-    if (matchData.matchRate < 70) weaknesses.push(`Bajo matching de keywords (${matchData.matchRate}%)`);
-    if (weaknesses.length === 0) weaknesses.push('Considerar agregar más keywords del Job Description');
-
-    const tips = [];
-    
-    if (characteristics.weightsKeywords >= 0.5) {
-      tips.push({
-        tip: `${atsName} prioriza keywords - usa términos exactos del JD`,
-        example: matchData.missingWords.length > 0 ? `Agregar: ${matchData.missingWords.slice(0, 3).join(', ')}` : 'Usa terminología específica de la industria',
-        why: 'Este ATS asigna 50%+ del score a coincidencia de palabras clave'
-      });
-    }
-    
-    if (characteristics.prefersDates) {
-      tips.push({
-        tip: 'Usa formato de fechas consistente',
-        example: 'Enero 2020 - Presente (o 01/2020 - Presente)',
-        why: `${atsName} extrae automáticamente tu historial laboral usando fechas`
-      });
-    }
-    
-    if (characteristics.prefersSimpleFormat) {
-      tips.push({
-        tip: 'Evita tablas, columnas múltiples y gráficos',
-        example: 'Usa formato lineal simple con secciones claras',
-        why: 'Formatos complejos confunden el parser del ATS'
-      });
-    } else {
-      tips.push({
-        tip: 'Este ATS maneja formatos más complejos',
-        example: 'Puedes usar tablas simples para skills o certificaciones',
-        why: `${atsName} tiene parser avanzado que puede procesar layouts más elaborados`
-      });
-    }
-
-    breakdown[atsName] = {
-      tips: tips.slice(0, 3),
-      strengths: strengths.slice(0, 4),
-      weaknesses: weaknesses.slice(0, 4)
-    };
-  });
-
-  return breakdown;
-}
-
+// === EXTRACCIÓN DE TEXTO DE PDF ===
 async function extractTextFromPDF(buffer) {
   return new Promise((resolve, reject) => {
     const pdfParser = new PDFParser();
-    
     pdfParser.on('pdfParser_dataError', errData => {
-      reject(new Error(errData.parserError));
+      console.error('PDF Parser Error:', errData.parserError);
+      reject(new Error('Error al parsear el PDF'));
     });
-    
     pdfParser.on('pdfParser_dataReady', pdfData => {
       try {
         let text = '';
         pdfData.Pages.forEach(page => {
+          if (!page.Texts) return;
           page.Texts.forEach(textItem => {
-            text += decodeURIComponent(textItem.R[0].T) + ' ';
+            if (textItem.R && textItem.R[0] && textItem.R[0].T) {
+              text += safeDecode(textItem.R[0].T) + ' ';
+            }
           });
         });
+        text = text.replace(/\s+/g, ' ').trim();
         resolve(text);
       } catch (err) {
+        console.error('Error en dataReady:', err);
         reject(err);
       }
     });
-
-    pdfParser.parseBuffer(buffer);
+    try {
+      pdfParser.parseBuffer(buffer);
+    } catch (err) {
+      reject(new Error('Buffer inválido para PDF'));
+    }
   });
 }
 
+// === ANÁLISIS CON GROQ - PROMPT MEJORADO ===
+async function analyzeWithAI(cvText, jdText) {
+  const prompt = `Eres el experto #1 mundial en Sistemas de Seguimiento de Candidatos (ATS - Applicant Tracking Systems) y optimización de CVs. Analiza este CV contra el Job Description y genera un reporte COMPLETO, DETALLADO y 100% ACCIONABLE.
+
+**JOB DESCRIPTION:**
+${jdText.substring(0, 2500)}
+
+**CURRICULUM VITAE:**
+${cvText.substring(0, 3500)}
+
+INSTRUCCIONES CRÍTICAS:
+
+1. **KEYWORDS PRECISAS**: En la sección "keywords", SOLO incluye en "missing" aquellas keywords que aparecen EXPLÍCITAMENTE en el Job Description pero NO están en el CV. NO inventes keywords ni agregues sinónimos que no estén literalmente en el JD.
+
+2. **EJEMPLOS ESPECÍFICOS**: CADA tip, recomendación y paso DEBE incluir ejemplos CONCRETOS basados en el JD y CV específicos del candidato
+
+3. **MÉTODO SOCRÁTICO**: Para cada sección del CV, proporciona preguntas que guíen al candidato a descubrir sus fortalezas
+
+4. **TEXTO COPIABLE**: Proporciona ejemplos que el candidato pueda copiar y pegar directamente en su CV
+
+5. **ADAPTADO AL CANDIDATO**: Los ejemplos deben reflejar la experiencia actual mostrada en el CV
+
+Responde SOLO con JSON válido (sin markdown). Formato EXACTO:
+
+{
+  "matchRate": 85,
+  "scores": {
+    "Workday": 88,
+    "Greenhouse": 82,
+    "iCIMS": 80,
+    "Lever": 89,
+    "SAP SuccessFactors": 78,
+    "BambooHR": 90,
+    "Taleo": 75,
+    "Jobvite": 81,
+    "Bullhorn": 79,
+    "Workable": 86
+  },
+  "recommendations": [
+    {
+      "priority": "critical",
+      "text": "Agrega la keyword 'gestión de proyectos ágiles' que aparece 4 veces en el JD pero 0 en tu CV",
+      "impact": "high",
+      "section": "experience",
+      "example": "• Lideré 8 proyectos ágiles con equipos de 12+ personas usando Scrum, logrando entregas 25% más rápidas y reduciendo bugs en 40%"
+    }
+  ],
+  "strengths": [
+    "Experiencia sólida de 5+ años en desarrollo de software",
+    "Dominio comprobado de Python, React y Node.js",
+    "Historial de liderazgo de equipos multidisciplinarios"
+  ],
+  "keywords": {
+    "technical": {
+      "found": ["Python", "React", "Node.js", "AWS", "Docker"],
+      "missing": ["Kubernetes", "CI/CD", "Terraform"]
+    },
+    "soft": {
+      "found": ["liderazgo", "comunicación"],
+      "missing": ["pensamiento crítico", "adaptabilidad"]
+    },
+    "industry": {
+      "found": ["fintech", "desarrollo ágil"],
+      "missing": ["DevOps", "microservicios"]
+    }
+  },
+  "atsBreakdown": {
+    "Workday": {
+      "score": 88,
+      "strengths": ["Formato compatible con estándares ATS", "Keywords bien distribuidas"],
+      "weaknesses": ["Falta sección de certificaciones", "Algunos bullets sin métricas"],
+      "tips": [
+        {
+          "tip": "Usa bullets con formato • al inicio de cada logro",
+          "example": "BASADO EN TU JD QUE MENCIONA 'gestión de equipos':\\n\\n• Lideré equipo de 12 desarrolladores aumentando productividad 40%\\n• Gestioné presupuesto de $500K optimizando recursos 25%\\n• Mentoré 5 junior developers acelerando onboarding 50%",
+          "why": "Workday ATS prioriza formato de bullets para extracción automática"
+        },
+        {
+          "tip": "Agrega sección 'Certifications' después de Education",
+          "example": "CERTIFICATIONS\\n• AWS Solutions Architect Associate (2024)\\n• Scrum Master Certified (2023)\\n• Google Cloud Professional (2023)",
+          "why": "Workday busca específicamente esta sección"
+        }
+      ]
+    },
+    "Greenhouse": {
+      "score": 82,
+      "strengths": ["Experiencia bien estructurada"],
+      "weaknesses": ["Falta summary ejecutivo"],
+      "tips": [
+        {
+          "tip": "Agrega summary de 3-4 líneas al inicio",
+          "example": "Senior Full-Stack Developer con 8+ años optimizando aplicaciones web de alto tráfico. Experto en React, Node.js y arquitectura cloud (AWS). Historial comprobado aumentando conversión 45% y liderando equipos de 12+ personas en ambientes ágiles.",
+          "why": "Greenhouse ATS usa el summary para matching inicial"
+        }
+      ]
+    }
+  },
+  "sectionScores": {
+    "experience": {
+      "score": 82,
+      "socraticGuide": {
+        "questions": [
+          "¿Cuántas personas se beneficiaron directamente de tu trabajo?",
+          "¿Qué métrica específica mejoró gracias a tu contribución?",
+          "¿Cuánto tiempo o dinero ahorraste a la empresa?",
+          "¿Qué problema crítico resolviste y cómo?"
+        ],
+        "badExample": "Desarrollé features para el producto y trabajé con el equipo",
+        "goodExample": "Desarrollé 15 features críticas que aumentaron engagement 34% y retención de usuarios en 2.5 meses, impactando a 50K+ usuarios activos",
+        "templateSTAR": {
+          "situacion": "El proyecto necesitaba [problema específico del JD]",
+          "tarea": "Me asignaron [tu responsabilidad relacionada al JD]",
+          "accion": "Implementé [solución usando skills del JD] liderando [equipo/proceso]",
+          "resultado": "Logré [métrica cuantificable] en [timeframe], generando [impacto en negocio]"
+        },
+        "jdKeywords": ["gestión de equipos", "metodología ágil", "optimización"],
+        "yourCurrentText": "Developer en empresa tech",
+        "improvedVersion": "Senior Developer liderando equipo de 8 personas con metodología ágil, optimizando arquitectura y reduciendo tiempo de deployment 60%"
+      }
+    },
+    "education": {
+      "score": 75,
+      "socraticGuide": {
+        "questions": [
+          "¿Qué proyectos académicos son relevantes para este puesto?",
+          "¿Obtuviste algún reconocimiento o GPA notable?",
+          "¿Participaste en actividades extracurriculares relevantes?"
+        ],
+        "badExample": "Licenciatura en Ingeniería",
+        "goodExample": "Licenciatura en Ingeniería de Software (GPA 3.8/4.0) con especialización en Arquitectura Cloud. Proyecto destacado: Sistema distribuido que soportó 100K usuarios concurrentes.",
+        "templateSTAR": {
+          "situacion": "El JD requiere formación en [área específica]",
+          "tarea": "Completé [grado/certificación] enfocándome en [especialización]",
+          "accion": "Desarrollé [proyecto final/tesis] aplicando [tecnologías del JD]",
+          "resultado": "Logré [GPA/reconocimiento] y [impacto del proyecto]"
+        }
+      }
+    },
+    "skills": {
+      "score": 68,
+      "socraticGuide": {
+        "questions": [
+          "¿En qué proyectos reales has usado cada skill?",
+          "¿Cuál es tu nivel de dominio: básico, intermedio o avanzado?",
+          "¿Puedes cuantificar tu experiencia con cada tecnología?"
+        ],
+        "badExample": "Python, React, AWS",
+        "goodExample": "Python (5+ años): 20+ proyectos backend con Django/Flask | React (4+ años): 15+ apps SPA con 100K+ usuarios | AWS (3+ años): arquitectura cloud para 5M+ requests/día",
+        "templateSTAR": {
+          "situacion": "El JD requiere [skill específico]",
+          "tarea": "Usé [skill] durante [tiempo] en [contexto]",
+          "accion": "Desarrollé [proyectos/sistemas] aplicando [skill específico]",
+          "resultado": "Logré [métrica de impacto] en [número] de proyectos"
+        }
+      }
+    }
+  },
+  "improvementPath": {
+    "current": 85,
+    "potential": 95,
+    "steps": [
+      {
+        "action": "Agrega 5 keywords técnicas faltantes críticas del JD",
+        "impact": "+5%",
+        "timeframe": "15 minutos",
+        "detailedExamples": {
+          "direct": "Si has usado estas tecnologías:\\n\\n• Implementé Kubernetes para orquestar 50+ microservicios, reduciendo downtime 90%\\n• Configuré pipelines CI/CD con Jenkins automatizando deployments y reduciendo errores 75%",
+          "indirect": "Si tienes experiencia relacionada:\\n\\n• Gestioné infraestructura de contenedores Docker mejorando eficiencia de deployments 60%\\n• Automaticé procesos de testing y deployment reduciendo tiempo de release de 2 días a 4 horas",
+          "noExperience": "Si no tienes experiencia directa (sé honesto pero destaca transferibles):\\n\\n• Experiencia sólida en DevOps y automatización, actualmente capacitándome en Kubernetes\\n• Familiarizado con conceptos de orquestación de contenedores y microservicios"
+        },
+        "keywords": ["Kubernetes", "CI/CD", "Terraform", "GraphQL", "Docker"]
+      }
+    ]
+  },
+  "atsDetectionGuide": {
+    "indicators": [
+      "Portal con campos estandarizados para skills y experiencia",
+      "Subida de archivo seguida de formularios adicionales",
+      "Preguntas de screening automáticas (ej: '¿Tienes 5+ años de experiencia?')",
+      "Sistema de puntaje o match visible al aplicar"
+    ],
+    "commonSystems": {
+      "startups": ["Greenhouse", "Lever", "Workable"],
+      "enterprises": ["Workday", "SAP SuccessFactors", "Taleo"],
+      "agencies": ["Bullhorn", "Jobvite"]
+    },
+    "detectionTips": [
+      "Busca el nombre del ATS en el footer del portal de aplicación",
+      "Revisa la URL: greenhouse.io, myworkday.com, etc.",
+      "LinkedIn Jobs usa su propio sistema interno",
+      "Indeed y otros agregadores NO usan ATS propio, redirigen a la empresa"
+    ]
+  },
+  "reasoning": "El CV muestra experiencia técnica sólida con 5+ años en desarrollo. Las principales áreas de mejora son: (1) agregar keywords críticas faltantes como 'Kubernetes' y 'CI/CD' mencionadas 3+ veces en el JD, (2) cuantificar logros actuales con métricas específicas, (3) crear summary ejecutivo impactante de 3-4 líneas que capture propuesta de valor."
+}
+
+RECUERDA: En la sección "keywords.missing", SOLO incluye términos que aparecen LITERALMENTE en el Job Description. No agregues sinónimos o variaciones.`;
+
+  try {
+    const completion = await groq.chat.completions.create({
+      model: "llama-3.3-70b-versatile",
+      messages: [
+        {
+          role: "system",
+          content: "Eres el experto #1 mundial en ATS (Applicant Tracking Systems - Sistemas de Seguimiento de Candidatos) y optimización de CVs. SIEMPRE generas análisis COMPLETOS con TODOS los campos requeridos, incluyendo ejemplos ESPECÍFICOS y COPIABLES para cada recomendación. NUNCA dejes campos vacíos. Proporciona datos REALES adaptados al CV y JD específicos. En la sección 'keywords.missing', SOLO incluyes keywords que aparecen EXPLÍCITAMENTE en el Job Description. Respondes SOLO con JSON válido sin markdown."
+        },
+        {
+          role: "user",
+          content: prompt
+        }
+      ],
+      temperature: 0.5,
+      max_tokens: 4096,
+      top_p: 0.95
+    });
+
+    const responseText = completion.choices[0].message.content.trim();
+    const jsonText = responseText
+      .replace(/```json\n?/g, '')
+      .replace(/```\n?/g, '')
+      .trim();
+
+    let analysis;
+    try {
+      analysis = JSON.parse(jsonText);
+    } catch (parseErr) {
+      console.error('JSON Parse Error:', parseErr);
+      console.error('Raw response:', jsonText.substring(0, 500));
+      throw new Error('Respuesta de AI no es JSON válido');
+    }
+
+    // VALIDACIÓN: Asegurar estructura completa
+    if (!analysis.keywords) {
+      analysis.keywords = {
+        technical: { found: [], missing: [] },
+        soft: { found: [], missing: [] },
+        industry: { found: [], missing: [] }
+      };
+    }
+
+    if (!analysis.improvementPath || !analysis.improvementPath.steps) {
+      analysis.improvementPath = {
+        current: analysis.matchRate || 70,
+        potential: (analysis.matchRate || 70) + 15,
+        steps: []
+      };
+    }
+
+    // Validar que atsBreakdown tenga tips con ejemplos
+    if (analysis.atsBreakdown) {
+      Object.keys(analysis.atsBreakdown).forEach(ats => {
+        if (!analysis.atsBreakdown[ats].tips || !Array.isArray(analysis.atsBreakdown[ats].tips)) {
+          analysis.atsBreakdown[ats].tips = [];
+        }
+      });
+    }
+
+    return analysis;
+
+  } catch (error) {
+    console.error('Groq API Error:', error);
+    throw new Error('Error al analizar con AI: ' + error.message);
+  }
+}
+
+// === HANDLER PRINCIPAL CON PARSING CORRECTO ===
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' });
 
+  if (!process.env.GROQ_API_KEY) {
+    return res.status(500).json({ 
+      error: 'Groq API key no configurada',
+      suggestion: 'Configura GROQ_API_KEY en Vercel'
+    });
+  }
+
   try {
+    // ✅ PASO 1: Leer todo el buffer del request
     const chunks = [];
     for await (const chunk of req) chunks.push(chunk);
     const buffer = Buffer.concat(chunks);
 
+    // ✅ PASO 2: Extraer boundary del content-type
     const contentType = req.headers['content-type'] || '';
     const boundaryMatch = contentType.match(/boundary=(.+?)(?:;|$)/);
     if (!boundaryMatch) return res.status(400).json({ error: 'No boundary found' });
@@ -328,9 +359,8 @@ export default async function handler(req, res) {
     
     let cvText = '';
     let jdText = '';
-    let cvFilename = '';
 
-    // Buscar partes manualmente en el buffer sin convertir a string
+    // ✅ PASO 3: Buscar partes en el buffer SIN convertir a string (CRÍTICO)
     let startPos = 0;
     while (true) {
       const boundaryPos = buffer.indexOf(boundaryBuffer, startPos);
@@ -351,11 +381,8 @@ export default async function handler(req, res) {
       const headerBuffer = part.slice(0, headerEnd);
       const bodyBuffer = part.slice(headerEnd + 4);
       
-      // Leer headers como string
+      // ✅ PASO 4: Leer headers como string, pero NO el body
       const headerStr = headerBuffer.toString('utf8');
-      
-      console.log('[DEBUG] Header:', headerStr.substring(0, 200));
-      console.log('[DEBUG] Body size:', bodyBuffer.length);
       
       const nameMatch = headerStr.match(/name="([^"]+)"/);
       const filenameMatch = headerStr.match(/filename="([^"]+)"/);
@@ -368,29 +395,34 @@ export default async function handler(req, res) {
       const name = nameMatch[1];
       const filename = filenameMatch?.[1];
       
-      console.log('[DEBUG] name:', name, 'filename:', filename);
+      console.log('[DEBUG] Processing:', name, filename ? `(${filename})` : '');
       
+      // ✅ PASO 5: Procesar según tipo
       if (name === 'jd') {
         jdText = bodyBuffer.toString('utf8').trim();
         console.log('[DEBUG] JD length:', jdText.length);
       } else if (name === 'cv' && filename) {
-        cvFilename = filename;
         console.log('[DEBUG] CV buffer size:', bodyBuffer.length);
         
         try {
           if (filename.toLowerCase().endsWith('.pdf')) {
             cvText = await extractTextFromPDF(bodyBuffer);
-            console.log('[DEBUG] PDF text extracted:', cvText.length);
+            console.log('[DEBUG] PDF text extracted:', cvText.length, 'chars');
           } else if (filename.toLowerCase().endsWith('.docx') || filename.toLowerCase().endsWith('.doc')) {
             const result = await mammoth.extractRawText({ buffer: bodyBuffer });
             cvText = result.value;
-            console.log('[DEBUG] DOCX text extracted:', cvText.length);
+            console.log('[DEBUG] DOCX text extracted:', cvText.length, 'chars');
+          } else {
+            return res.status(400).json({ 
+              error: 'Formato no soportado',
+              suggestion: 'Usa archivos .pdf o .docx'
+            });
           }
         } catch (fileError) {
           console.error('File processing error:', fileError);
           return res.status(400).json({ 
             error: `Error procesando archivo: ${fileError.message}`,
-            suggestion: 'Intenta con un archivo DOCX o PDF diferente'
+            suggestion: 'Verifica que el archivo no esté corrupto'
           });
         }
       }
@@ -400,59 +432,34 @@ export default async function handler(req, res) {
 
     if (!cvText || !jdText) {
       return res.status(400).json({ 
-        error: 'Falta CV o descripción del puesto',
+        error: 'Falta CV o Job Description',
         details: { hasCv: !!cvText, hasJd: !!jdText }
       });
     }
 
-    // Análisis mejorado
-    const matchData = calculateEnhancedMatchRate(cvText, jdText);
-    const scores = calculateATSScores(cvText, jdText, matchData);
-    const cvStructure = analyzeStructure(cvText);
-    const atsBreakdown = generateATSBreakdown(scores, cvStructure, matchData);
-
-    // Generar recomendaciones inteligentes
-    const tips = [];
+    console.log('[DEBUG] Calling AI analysis...');
+    const aiAnalysis = await analyzeWithAI(cvText, jdText);
+    console.log('[DEBUG] AI analysis completed');
     
-    if (matchData.missingWords.length > 0) {
-      tips.push(`Palabras clave faltantes: "${matchData.missingWords.slice(0, 3).join('", "')}"`);
-    }
-    
-    if (!cvStructure.hasDates) {
-      tips.push('Agrega fechas en formato MM/YYYY para mejorar parsing');
-    }
-    
-    if (!cvStructure.hasMetrics) {
-      tips.push('Incluye métricas cuantificables: "Aumenté ventas en 25%"');
-    }
-    
-    if (!cvStructure.hasBullets) {
-      tips.push('Usa bullet points para mejorar legibilidad');
-    }
-
-    if (cvStructure.hasComplexFormatting) {
-      tips.push('Evita tablas y formatos complejos - usa texto simple');
-    }
-
-    const average = Math.round(Object.values(scores).reduce((a,b) => a+b, 0) / Object.keys(scores).length);
+    const average = Math.round(
+      Object.values(aiAnalysis.scores).reduce((a, b) => a + b, 0) / 
+      Object.keys(aiAnalysis.scores).length
+    );
 
     res.json({
       success: true,
-      matchRate: matchData.matchRate,
-      scores,
+      matchRate: aiAnalysis.matchRate,
+      scores: aiAnalysis.scores,
       average,
-      recommendations: tips.slice(0, 4),
-      atsBreakdown,
-      analysis: {
-        totalKeywords: matchData.totalKeywords,
-        matchedKeywords: matchData.matchedKeywords,
-        techSkillRate: matchData.techSkillRate,
-        structure: {
-          hasDates: cvStructure.hasDates,
-          hasBullets: cvStructure.hasBullets,
-          hasMetrics: cvStructure.hasMetrics
-        }
-      }
+      recommendations: aiAnalysis.recommendations,
+      strengths: aiAnalysis.strengths || [],
+      keywords: aiAnalysis.keywords || {},
+      atsBreakdown: aiAnalysis.atsBreakdown || {},
+      sectionScores: aiAnalysis.sectionScores || {},
+      improvementPath: aiAnalysis.improvementPath || {},
+      atsDetectionGuide: aiAnalysis.atsDetectionGuide || {},
+      reasoning: aiAnalysis.reasoning,
+      poweredBy: 'Groq Llama 3.3 70B'
     });
 
   } catch (error) {
