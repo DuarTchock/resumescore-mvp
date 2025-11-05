@@ -322,52 +322,69 @@ export default async function handler(req, res) {
     if (!boundaryMatch) return res.status(400).json({ error: 'No boundary found' });
     
     const boundary = boundaryMatch[1].trim();
-    const parts = buffer.toString('binary').split(`--${boundary}`);
+    const boundaryBuffer = Buffer.from(`--${boundary}`);
     
     console.log('[DEBUG] Boundary:', boundary);
-    console.log('[DEBUG] Parts found:', parts.length);
     
     let cvText = '';
     let jdText = '';
+    let cvFilename = '';
 
-    for (let i = 0; i < parts.length; i++) {
-      const part = parts[i];
-      if (!part || part === '--\r\n' || part === '--') continue;
-
-      const headerEndIndex = part.indexOf('\r\n\r\n');
-      if (headerEndIndex === -1) continue;
-
-      const header = part.substring(0, headerEndIndex);
-      const body = part.substring(headerEndIndex + 4).replace(/\r\n--$/, '');
-
-      console.log(`[DEBUG] Part ${i} - header length:`, header.length);
-      console.log(`[DEBUG] Part ${i} - body length:`, body.length);
-      console.log(`[DEBUG] Part ${i} - header preview:`, header.substring(0, 200));
-
-      const nameMatch = header.match(/name="([^"]+)"/);
-      const filenameMatch = header.match(/filename="([^"]+)"/);
-      const name = nameMatch?.[1];
+    // Buscar partes manualmente en el buffer sin convertir a string
+    let startPos = 0;
+    while (true) {
+      const boundaryPos = buffer.indexOf(boundaryBuffer, startPos);
+      if (boundaryPos === -1) break;
+      
+      const nextBoundaryPos = buffer.indexOf(boundaryBuffer, boundaryPos + boundaryBuffer.length);
+      if (nextBoundaryPos === -1) break;
+      
+      const part = buffer.slice(boundaryPos + boundaryBuffer.length, nextBoundaryPos);
+      
+      // Buscar fin de headers (\r\n\r\n)
+      const headerEnd = part.indexOf(Buffer.from('\r\n\r\n'));
+      if (headerEnd === -1) {
+        startPos = nextBoundaryPos;
+        continue;
+      }
+      
+      const headerBuffer = part.slice(0, headerEnd);
+      const bodyBuffer = part.slice(headerEnd + 4);
+      
+      // Leer headers como string
+      const headerStr = headerBuffer.toString('utf8');
+      
+      console.log('[DEBUG] Header:', headerStr.substring(0, 200));
+      console.log('[DEBUG] Body size:', bodyBuffer.length);
+      
+      const nameMatch = headerStr.match(/name="([^"]+)"/);
+      const filenameMatch = headerStr.match(/filename="([^"]+)"/);
+      
+      if (!nameMatch) {
+        startPos = nextBoundaryPos;
+        continue;
+      }
+      
+      const name = nameMatch[1];
       const filename = filenameMatch?.[1];
-
-      console.log(`[DEBUG] Part ${i} - name:`, name, 'filename:', filename);
-
-      if (!name) continue;
-
+      
+      console.log('[DEBUG] name:', name, 'filename:', filename);
+      
       if (name === 'jd') {
-        jdText = body.trim();
-        console.log('[DEBUG] JD text length:', jdText.length);
+        jdText = bodyBuffer.toString('utf8').trim();
+        console.log('[DEBUG] JD length:', jdText.length);
       } else if (name === 'cv' && filename) {
+        cvFilename = filename;
+        console.log('[DEBUG] CV buffer size:', bodyBuffer.length);
+        
         try {
-          const fileBuffer = Buffer.from(body, 'binary');
-          console.log('[DEBUG] File buffer size:', fileBuffer.length);
-          
-          if (filename.endsWith('.pdf')) {
-            cvText = await extractTextFromPDF(fileBuffer);
-            console.log('[DEBUG] PDF text extracted, length:', cvText.length);
-          } else if (filename.endsWith('.docx')) {
-            const result = await mammoth.extractRawText({ buffer: fileBuffer });
+          if (filename.toLowerCase().endsWith('.pdf')) {
+            cvText = await extractTextFromPDF(bodyBuffer);
+            console.log('[DEBUG] PDF text extracted:', cvText.length);
+          } else if (filename.toLowerCase().endsWith('.docx') || filename.toLowerCase().endsWith('.doc')) {
+            const result = await mammoth.extractRawText({ buffer: bodyBuffer });
             cvText = result.value;
-            console.log('[DEBUG] DOCX text extracted, length:', cvText.length);
+            console.log('[DEBUG] DOCX text extracted:', cvText.length);
           }
         } catch (fileError) {
           console.error('File processing error:', fileError);
@@ -377,6 +394,8 @@ export default async function handler(req, res) {
           });
         }
       }
+      
+      startPos = nextBoundaryPos;
     }
 
     if (!cvText || !jdText) {
